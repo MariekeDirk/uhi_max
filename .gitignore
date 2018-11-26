@@ -6,6 +6,9 @@ inst/Rdata
 inst/Cabauw_meteo
 inst/Interpolated_stations
 inst/UHImax
+<<<<<<< HEAD
 inst/Grids_veg_svf
 inst/Rscripts/uhimax_utrecht_cache
 inst/Rscripts/uhimax_utrecht_files
+=======
+>>>>>>> 53efa3b53d21ee51724dd87988e1b4073f35621a
