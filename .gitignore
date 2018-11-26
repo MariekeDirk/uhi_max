@@ -3,3 +3,9 @@
 .RData
 .Ruserdata
 inst/Rdata
+inst/Cabauw_meteo
+inst/Interpolated_stations
+inst/UHImax
+inst/Grids_veg_svf
+inst/Rscripts/uhimax_utrecht_cache
+inst/Rscripts/uhimax_utrecht_files
