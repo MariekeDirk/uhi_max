@@ -4,7 +4,7 @@
 \alias{UHImax}
 \title{Maximum urban heat island intensity}
 \usage{
-UHImax(SVF, fveg, S, DTR, U, a1 = 2, a2 = 1, a3 = 1)
+UHImax(SVF, fveg, S, DTR, U, a1 = 2, a2 = 1, a3 = 1, lambda = 3.6)
 }
 \arguments{
 \item{SVF}{the sky view factor at the locations}

@@ -1,0 +1,220 @@
+---
+title: "Urban Heat Island Utrecht"
+author: "Marieke Dirksen"
+date: "22 november 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Initialization
+```{r load libs, include=FALSE}
+library(uhimax)
+library(raster)
+library(rgdal)
+library(mapview)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(caret)
+```
+
+## Parameters
+
+```{r params}
+Cp<-1005 #specific heat capacity
+R=287.058 # specific gas constant for dry air (J/(kg·K))
+lambda=4
+wd<-"C:/Users/marie/OneDrive/Documenten/uhi_max/"
+```
+
+## From 10min data to Daily UHImax parameters
+```{r, cache=TRUE}
+cabauw_10min<-fread(paste0(wd,"inst/Cabauw_meteo/Cabauw_T_S_W_2016_201809.csv"))
+cabauw_10min$IT_DATETIME<-as.POSIXct(cabauw_10min$IT_DATETIME,format="%Y%m%d_%H%M00_000000")
+
+Cabauw.S<-subset(cabauw_10min[which(cabauw_10min$DS_CODE=="348_S_a"),],
+                 select = c("IT_DATETIME","DS_CODE","TOS.Q_GLOB_10"))
+Cabauw.T<-subset(cabauw_10min[which(cabauw_10min$DS_CODE=="348_T_a"),],
+                 select = c("IT_DATETIME","DS_CODE","TOT.T_DRYB_10"))
+Cabauw.W<-subset(cabauw_10min[which(cabauw_10min$DS_CODE=="348_W_a"),],
+                 select = c("IT_DATETIME","DS_CODE","TOW.FF_SENSOR_10"))
+
+S<-calc_S(Cabauw.S$IT_DATETIME,Cabauw.S$TOS.Q_GLOB_10)
+DTR<-calc_DTR(Cabauw.T$IT_DATETIME,Cabauw.T$TOT.T_DRYB_10)
+U<-calc_U(Cabauw.W$IT_DATETIME,Cabauw.W$TOW.FF_SENSOR_10)
+
+Meteo_params<-data.frame(DTR,"S"=S$S[1:length(DTR$start)],"U"=U$W)
+Meteo_params$start<-as.POSIXct(Meteo_params$start)
+Meteo_params$stop<-as.POSIXct(Meteo_params$stop)
+saveRDS(Meteo_params,paste0(wd,"inst/Rdata/Meteo_params_cabauw.rds"))
+
+
+```
+
+## Data preprocessing
+```{r preprocessing,cache=TRUE}
+cabauw_parms<-readRDS(paste0(wd,"inst/Rdata/Meteo_params_cabauw.rds"))
+
+cabauw_P<-fread(paste0(wd,"inst/Cabauw_meteo/Cabauw_P_10min.csv"))
+cabauw_P$IT_DATETIME<-as.POSIXct(cabauw_P$IT_DATETIME,format="%Y%m%d_%H%M00_000000")
+
+cabauw_T<-fread(paste0(wd,"inst/Cabauw_meteo/Cabauw_T_10min.csv"))
+cabauw_T$IT_DATETIME<-as.POSIXct(cabauw_T$IT_DATETIME,format="%Y%m%d_%H%M00_000000")
+cabauw_PT<-merge(cabauw_P,cabauw_T,by="IT_DATETIME")
+
+air_density<-calc_U(cabauw_PT$IT_DATETIME,(cabauw_PT$TOA.P_NAP_MSL_10*100)/(R*(cabauw_PT$TOT.T_DRYB_10+273.15)))
+names(air_density)<-c("start","stop","rho")
+cabauw_parms<-merge(cabauw_parms,air_density,by=c("start","stop"))
+cabauw_parms$S_new<-cabauw_parms$S/(cabauw_parms$rho*Cp)
+cabauw_parms$meteo<-(((cabauw_parms$S_new)*cabauw_parms$DTR^3)/cabauw_parms$U)^(1/lambda)
+
+svf_grn<-readRDS(paste0(wd,"inst/Rdata/wunderground_svf_grn.rds"))
+df.svf_grn<-data.frame(svf_grn)
+df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299"),]
+```
+
+## Calculate UHI max parameters for all cases
+```{r,cache=TRUE}
+for(i in 1:length(df.svf_grn$Station.ID)){
+STN<-df.svf_grn$Station.ID[i]
+stn<-readRDS(paste0(wd,"inst/Interpolated_stations/",
+                    STN,"_filtered.rds"))
+wur_cabauw<-merge(x=stn$interpolated_time,y=cabauw_T,by.x="new_time",by.y="IT_DATETIME")
+wur_cabauw<-wur_cabauw[complete.cases(wur_cabauw),]
+UHI<-calc_UHImax(time = wur_cabauw$new_time,
+                        Tcity = wur_cabauw$T_int,
+                        Tref = wur_cabauw$TOT.T_DRYB_10)
+UHI$Tcity<-calc_U(time=wur_cabauw$new_time,wur_cabauw$T_int)$W
+UHI$Tref<-calc_U(time=wur_cabauw$new_time,wur_cabauw$TOT.T_DRYB_10)$W
+# UHIcalc_stn<-cbind(cabauw_parms,UHIcalc)
+UHI<-merge(UHI,cabauw_parms,by=c("start","stop"))
+UHI$svf<-df.svf_grn$svf[i]
+UHI$fveg<-df.svf_grn$grn[i]
+UHI$Cp<-Cp
+UHI$stn<-STN
+
+
+# p<-ggplot(UHI,aes(UHImeasured,meteo))+geom_point()+geom_abline()
+# ggsave(p,filename=paste0(wd,"inst/UHImax/fig/",
+#                 STN,".png"))
+write.table(UHI,paste0(wd,"inst/UHImax/",
+                       STN,"_UHIparams.txt"),
+            row.names = FALSE,
+            col.names = TRUE,
+            sep=",")
+}
+```
+
+## Subset based on weather conditions
+```{r create a subset}
+####################Select control days
+meteo.df<-fread(paste0(wd,"inst/Cabauw_meteo/rain_wind_rh_hour.csv"))
+meteo.df$IT_DATETIME<-as.POSIXct(meteo.df$IT_DATETIME,format="%Y%m%d_%H%M00_000000")
+time<-meteo.df$IT_DATETIME
+rh<-meteo.df$BGH.U
+rain<-meteo.df$BGH.Q_RH
+wind<-meteo.df$BGH.FH
+
+days_subset<-uhi_sub(time=time,wind=wind,rain=rain,rh=rh)
+######################
+uhimax_files<-list.files(paste0(wd,"inst/UHImax/"),
+                         full.names = TRUE,pattern=".txt")
+uhimax_files<-lapply(uhimax_files,fread)
+uhimax_Utrecht<-do.call("rbind",uhimax_files)
+
+uhimax_Utrecht<-merge(days_subset,uhimax_Utrecht,by=c("start","stop"))
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Rain==TRUE),]
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Wind==TRUE),]
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$rh==TRUE),]
+uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Select==TRUE),]
+uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Tref>17),]
+uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299")),]
+```
+
+## Correlations with the three meteo params
+```{r}
+uhi_u<-ggplot(uhimax_Utrecht,aes(U,UHImeasured,colour=DTR)) +geom_point() + scale_color_gradientn(colours = terrain.colors(20))
+uhi_DTR<-ggplot(uhimax_Utrecht,aes(DTR,UHImeasured,colour=S_new)) + geom_point()+scale_color_gradientn(colours = heat.colors(20))
+uhi_S<-ggplot(uhimax_Utrecht,aes(S_new,UHImeasured,colour=U)) +geom_point() + geom_point()+scale_color_gradientn(colours = topo.colors(20))
+ggsave(uhi_u,filename = paste0(wd,"inst/UHImax/fig/uhi_u.png"))
+ggsave(uhi_DTR,filename = paste0(wd,"inst/UHImax/fig/uhi_DTR.png"))
+ggsave(uhi_S,filename = paste0(wd,"inst/UHImax/fig/uhi_S.png"))
+uhi_u
+uhi_DTR
+uhi_S
+
+ggplot(uhimax_Utrecht,aes(UHImeasured,(2-svf-fveg)*meteo,colour=factor(stn))) +geom_point() +geom_abline() +xlim(0,10)+ylim(0,10)
+
+caret::R2((2-uhimax_Utrecht$svf-uhimax_Utrecht$fveg)*uhimax_Utrecht$meteo,uhimax_Utrecht$UHImeasured)
+caret::RMSE((2-uhimax_Utrecht$svf-uhimax_Utrecht$fveg)*uhimax_Utrecht$meteo,uhimax_Utrecht$UHImeasured)
+```
+
+## Exploring non-linearity
+```{r visualization}
+ggplot(uhimax_Utrecht,aes(UHImeasured,(2-svf-fveg)*meteo,colour=factor(stn))) +geom_point() +geom_abline() + xlim(0,10) +ylim(0,10)
+
+ggplot(uhimax_Utrecht,aes(x=UHImeasured/(DTR*U),y=S/(rho*Cp*24))) +geom_point() +ylim(0,0.018) +xlim(0,0.80)
+
+# y<-uhimax_Utrecht$S/(uhimax_Utrecht$rho*Cp*24)
+# x<-uhimax_Utrecht$UHImeasured/(uhimax_Utrecht$DTR*uhimax_Utrecht$U)
+# df<-data.frame(y,x)
+# fit=nls(y ~ b*x^a,data=df,start=list(b=0.27,a=1.7))
+
+#p.meteo<-ggplot(uhimax_Utrecht,aes(UHImeasured,meteo,colour=factor(stn))) +geom_point() +geom_abline()
+#p.meteo
+#ggsave(p.meteo,filename = paste0(wd,"inst/UHImax/fig/uhimax_measured.png"))
+```
+
+## Correlations with the vegetation and sky view factor
+```{r}
+#####################Fitting it ourselfs
+library(lme4)
+fits<-lmList(formula=UHImeasured~0+meteo | stn,data=uhimax_Utrecht) #Residual standard error: 0.04697533
+coef_fits<-coef(fits)
+names(coef_fits)<-"alpha"
+coef_fits$stn<-rownames(coef_fits)
+full_m<-merge(coef_fits,uhimax_Utrecht,by="stn")
+
+# intercept_station<-coef_fits[1]+full_m$svf[1]+full_m$fveg[1]
+
+# fit=lm(alpha ~ svf+fveg,data=full_m)
+# a1=coef(fit)[1]
+# a2=coef(fit)[2]
+# a3=coef(fit)[3]
+
+ggplot(data=full_m,aes(fveg,alpha))+geom_point()+
+  xlab("fveg")+
+  ylab("alpha")+
+  geom_abline()
+
+ggplot(data=full_m,aes(svf,alpha))+geom_point()+
+  xlab("svf")+
+  ylab("alpha")+
+  geom_abline()
+
+ggplot(data=full_m,aes(2-svf-fveg,alpha,colour=factor(stn)))+geom_point()+
+  xlab("2-SVF-fveg")+
+  ylab("alpha")+
+  geom_abline()
+
+```
+
+
+
+## Using the formula of Theeuwes for Utrecht
+```{r grid prections,eval=FALSE}
+svf<-stack(paste0(wd,"inst/Grids_veg_svf/svf_utrecht_1m.grd"))
+fveg<-stack(paste0(wd,"/inst/Grids_veg_svf/greenness_utrecht_smooth_500m.grd"))
+fveg<-projectRaster(fveg,crs=crs(svf))
+
+svf<-resample(svf,fveg,method="bilinear")
+
+st<-(2-svf-fveg)*max(uhimax_Utrecht$meteo)
+mapview(st)
+```
+
+

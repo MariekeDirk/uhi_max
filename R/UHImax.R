@@ -14,8 +14,6 @@
 #' @export
 UHImax<-function(SVF,fveg,S,DTR,U,a1=2,a2=1,a3=1,lambda=3.6){
   UHImax<-(a1-a2*SVF-a3*fveg)*((S*(DTR^3)/U)^(1/lambda))
-  # UHImax<-((1.94-0.93*SVF-0.88*fveg)*((S*DTR^3)/U))^(1/4)
-  # UHImax<-(1.13-0.42*SVF-0.52*fveg)*(((S*DTR^3)/U)^(1/4))
   return(UHImax)
 }
 
@@ -29,6 +27,7 @@ UHImax<-function(SVF,fveg,S,DTR,U,a1=2,a2=1,a3=1,lambda=3.6){
 #'@param rh relative humidity in %
 #'@export
 uhi_sub<-function(time,rain,wind,rh){
+  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"rain"=as.numeric(rain),"wind"=as.numeric(wind),"rh"=as.numeric(rh))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
@@ -73,6 +72,7 @@ uhi_sub<-function(time,rain,wind,rh){
 #' @param solar_irr solar irradiance measurements at the times of the time vector
 #' @export
 calc_S<-function(time,solar_irr){
+  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"solar_irr"=as.numeric(solar_irr))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
@@ -90,7 +90,7 @@ calc_S<-function(time,solar_irr){
     start<-start[1:length(stop)]
   }
 
-  S_out<-mapply(function(y,z) mean(df.h$S[y:z],na.rm=TRUE),
+  S_out<-mapply(function(y,z) sum(df.h$S[y:z],na.rm=TRUE)/24,
                 y=start,
                 z=stop)
   ss<-data.frame("start"=df.h$hour[start],"stop"=df.h$hour[stop],"S"=S_out)
@@ -105,14 +105,15 @@ calc_S<-function(time,solar_irr){
 #' @param temperature temperature measurmenents at the times of the time vector
 #' @export
 calc_DTR<-function(time,temperature){
-  df<-data.frame(time,"temperature"=as.numeric(temperature))
+  requireNamespace("lubridate",quietly = TRUE)
+  df<-data.frame(time,"T"=as.numeric(temperature))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
-  df.h<-df %>% group_by(day,hour) %>% summarize(T=mean(temperature,na.rm=TRUE))
-  df.h<-data.frame(df.h)
-  df.h$hour<-as.POSIXct(df.h$hour)
-  start=which(hour(df.h$hour)==8)
-  stop=which(hour(df.h$hour)==7)
+  # df.h<-df %>% group_by(day,hour) %>% summarize(T=mean(temperature,na.rm=TRUE))
+  # df.h<-data.frame(df.h)
+  # df.h$hour<-as.POSIXct(df.h$hour)
+  start=which(hour(df$time)==8 & minute(df$time)==0)
+  stop=which(hour(df$time)==7  & minute(df$time)==0)
 
   if(start[1]>stop[1]){
     stop<-stop[2:length(stop)]
@@ -122,14 +123,14 @@ calc_DTR<-function(time,temperature){
     start<-start[1:length(stop)]
   }
 
-  Tmin<-mapply(function(y,z) min(df.h$T[y:z],na.rm=TRUE),
+  Tmin<-mapply(function(y,z) min(df$T[y:z],na.rm=TRUE),
                y=start,
                z=stop)
-  Tmax<-mapply(function(y,z) max(df.h$T[y:z],na.rm=TRUE),
+  Tmax<-mapply(function(y,z) max(df$T[y:z],na.rm=TRUE),
                y=start,
                z=stop)
   DTR<-Tmax-Tmin
-  ss<-data.frame("start"=df.h$hour[start],"stop"=df.h$hour[stop],"DTR"=DTR)
+  ss<-data.frame("start"=df$hour[start],"stop"=df$hour[stop],"DTR"=DTR)
   return(ss)
 }
 
@@ -141,6 +142,7 @@ calc_DTR<-function(time,temperature){
 #' @param wind wind speed at the times of the time vector
 #' @export
 calc_U<-function(time,wind){
+  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"wind"=as.numeric(wind))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
@@ -174,6 +176,7 @@ calc_U<-function(time,wind){
 #' @param Tcity Temperature within the city for-which the UHImax is calculated
 #' @export
 calc_UHImax<-function(time,Tref,Tcity){
+  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"Tref"=as.numeric(Tref),"Tcity"=as.numeric(Tcity))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
