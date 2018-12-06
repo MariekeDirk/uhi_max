@@ -29,9 +29,35 @@ Cp<-1005 #specific heat capacity
 R=287.058 # specific gas constant for dry air (J/(kg·K))
 lambda=4
 wd<-"C:/Users/marie/OneDrive/Documenten/uhi_max/"
+
+svf<-stack(paste0(wd,"inst/Grids_veg_svf/svf_utrecht_1m.grd"))
+fveg<-stack(paste0(wd,"/inst/Grids_veg_svf/greenness_utrecht_smooth_500m.grd"))
+fveg<-projectRaster(fveg,crs=crs(svf))
+
+IUtrecht23<-data.frame(lon=52.079,lat=5.139)
+coordinates(IUtrecht23)<- ~lat+lon
+crs(IUtrecht23)<-crs("+init=epsg:4326")
+
+mapview(fveg) + mapview(IUtrecht23)
+
+IUtrecht23_fveg<-raster::extract(fveg,IUtrecht23)
+IUtrecht23_svf<-raster::extract(svf,IUtrecht23)
 ```
 
 ## From 10min data to Daily UHImax parameters
+
+From the autmaomatic weather stations (AWS) in the rural area the following data is required:
+
+* 10 minute global radiation
+* 10 minute wind speed at 10m
+* 10 minute temperature at 1.5m
+* 10 minute pressure derived to MSL
+* 1 hour relative humidity
+* 1 hour precipitation 
+* 1 hour mean wind
+
+The 10 minute data from global radiation, wind speed, temperature and pressure is used to calculate the UHImax. The hourly relative humidity, precipitation and mean wind are used to filter out synoptic situations with frontal system and fog. Under these different conditions there is no clear relation between the AWS and city temperature.
+
 ```{r, cache=TRUE}
 cabauw_10min<-fread(paste0(wd,"inst/Cabauw_meteo/Cabauw_T_S_W_2016_201809.csv"))
 cabauw_10min$IT_DATETIME<-as.POSIXct(cabauw_10min$IT_DATETIME,format="%Y%m%d_%H%M00_000000")
@@ -56,6 +82,16 @@ saveRDS(Meteo_params,paste0(wd,"inst/Rdata/Meteo_params_cabauw.rds"))
 ```
 
 ## Data preprocessing
+
+Within the city of Utrecht we have carefully selected three stations from the [Wunderground network](www.wunderground.com):
+
+* IUTRECHT23 (Used by Theeuwes2017)
+* IUTRECHT196
+* IUTRECHT376
+* IUTRECHT299
+
+These stations have been measuring the city temperature for the past couple of years. The data can be downloaded using `download_time_seq`, note that the temperature is in Farenheid and not degrees Celcius. The data has been filtered and interpolated to 10minute timestamps.
+
 ```{r preprocessing,cache=TRUE}
 cabauw_parms<-readRDS(paste0(wd,"inst/Rdata/Meteo_params_cabauw.rds"))
 
@@ -72,17 +108,18 @@ cabauw_parms<-merge(cabauw_parms,air_density,by=c("start","stop"))
 cabauw_parms$S_new<-cabauw_parms$S/(cabauw_parms$rho*Cp)
 cabauw_parms$meteo<-(((cabauw_parms$S_new)*cabauw_parms$DTR^3)/cabauw_parms$U)^(1/lambda)
 
-svf_grn<-readRDS(paste0(wd,"inst/Rdata/wunderground_svf_grn.rds"))
-df.svf_grn<-data.frame(svf_grn)
-df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299"),]
+# svf_grn<-readRDS(paste0(wd,"inst/Rdata/wunderground_svf_grn.rds"))
+# df.svf_grn<-data.frame(svf_grn)
+# df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299"),]
 ```
 
 ## Calculate UHI max parameters for all cases
+
 ```{r,cache=TRUE}
-for(i in 1:length(df.svf_grn$Station.ID)){
-STN<-df.svf_grn$Station.ID[i]
-stn<-readRDS(paste0(wd,"inst/Interpolated_stations/",
-                    STN,"_filtered.rds"))
+# for(i in 1:length(df.svf_grn$Station.ID)){
+# STN<-df.svf_grn$Station.ID[i]
+STN<-"IUTRECHT23"
+stn<-readRDS(paste0(wd,"inst/Wunderground/Filtered/IUTRECHT23_filtered.rds"))
 wur_cabauw<-merge(x=stn$interpolated_time,y=cabauw_T,by.x="new_time",by.y="IT_DATETIME")
 wur_cabauw<-wur_cabauw[complete.cases(wur_cabauw),]
 UHI<-calc_UHImax(time = wur_cabauw$new_time,
@@ -92,8 +129,8 @@ UHI$Tcity<-calc_U(time=wur_cabauw$new_time,wur_cabauw$T_int)$W
 UHI$Tref<-calc_U(time=wur_cabauw$new_time,wur_cabauw$TOT.T_DRYB_10)$W
 # UHIcalc_stn<-cbind(cabauw_parms,UHIcalc)
 UHI<-merge(UHI,cabauw_parms,by=c("start","stop"))
-UHI$svf<-df.svf_grn$svf[i]
-UHI$fveg<-df.svf_grn$grn[i]
+UHI$svf<-as.numeric(IUtrecht23_svf)
+UHI$fveg<-as.numeric(IUtrecht23_fveg)
 UHI$Cp<-Cp
 UHI$stn<-STN
 
@@ -106,7 +143,7 @@ write.table(UHI,paste0(wd,"inst/UHImax/",
             row.names = FALSE,
             col.names = TRUE,
             sep=",")
-}
+# }
 ```
 
 ## Subset based on weather conditions
@@ -132,7 +169,8 @@ uhimax_Utrecht<-merge(days_subset,uhimax_Utrecht,by=c("start","stop"))
 # uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$rh==TRUE),]
 uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Select==TRUE),]
 uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Tref>17),]
-uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299")),]
+uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT23")),]
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT23","IUTRECHT196","IUTRECHT376","IUTRECHT299")),]
 ```
 
 ## Correlations with the three meteo params
@@ -207,10 +245,6 @@ ggplot(data=full_m,aes(2-svf-fveg,alpha,colour=factor(stn)))+geom_point()+
 
 ## Using the formula of Theeuwes for Utrecht
 ```{r grid prections,eval=FALSE}
-svf<-stack(paste0(wd,"inst/Grids_veg_svf/svf_utrecht_1m.grd"))
-fveg<-stack(paste0(wd,"/inst/Grids_veg_svf/greenness_utrecht_smooth_500m.grd"))
-fveg<-projectRaster(fveg,crs=crs(svf))
-
 svf<-resample(svf,fveg,method="bilinear")
 
 st<-(2-svf-fveg)*max(uhimax_Utrecht$meteo)
