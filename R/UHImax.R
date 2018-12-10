@@ -60,7 +60,7 @@ uhi_sub<-function(time,rain,wind,rh){
             y=start,
             z=stop)
 
-  U2<-mapply(function(y,z) mean(df$wind[y:z])<0.5,
+  U2<-mapply(function(y,z) mean(df$wind[y:z])>0.5,
             y=start,
             z=stop)
   meteo<-data.frame(R,RH,U,U2)

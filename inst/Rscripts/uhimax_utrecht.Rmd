@@ -59,7 +59,7 @@ From the autmaomatic weather stations (AWS) in the rural area the following data
 The 10 minute data from global radiation, wind speed, temperature and pressure is used to calculate the UHImax. The hourly relative humidity, precipitation and mean wind are used to filter out synoptic situations with frontal system and fog. Under these different conditions there is no clear relation between the AWS and city temperature.
 
 
-```{r prepare Cabauw, cache=TRUE}
+```{r prepare Cabauw, warning=FALSE, cache=TRUE}
 Cabauw_data<-prepare_Cabauw(ten_min = paste0(wd,"Cabauw_meteo/cabauw10min.csv"),
                             hourly_data = paste0(wd,"Cabauw_meteo/cabauw_hourly.csv"))
 # svf_grn<-readRDS(paste0(wd,"inst/Rdata/wunderground_svf_grn.rds"))
@@ -123,10 +123,10 @@ write.table(UHI,paste0(wd,"UHImax/",
 uhimax_Utrecht<-fread(paste0(wd,"UHImax/IUTRECHT23_UHIparams.txt"))
 
 uhimax_Utrecht<-merge(Cabauw_data$Cabauw_sub,uhimax_Utrecht,by=c("start","stop"))
-uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Rain==TRUE),]
-uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Wind==TRUE),]
-uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$rh==TRUE),]
-# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Select==TRUE),]
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Rain==TRUE),]
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Wind==TRUE),]
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$rh==TRUE),]
+uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Select==TRUE),]
 uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Tref>17),]
 # uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT23")),]
 # uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT23","IUTRECHT196","IUTRECHT376","IUTRECHT299")),]
@@ -157,7 +157,7 @@ The formula of Theeuwes(2017) was derived for:
 * 0.2 < SVF < 0.9
 
 Outside of this range the formula has not been tested.
-```{r grid prections,eval=TRUE,cache=TRUE}
+```{r grid prections,eval=TRUE}
 svf.r<-resample(svf,fveg,method="bilinear")
 values(svf.r)[values(svf.r)<0.2 | values(svf.r)>0.95] = NA
 values(fveg)[values(fveg)<0 | values(fveg)>0.4] = NA
