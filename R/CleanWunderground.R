@@ -13,13 +13,13 @@
 #'@param Tunit Temperature unit, since December 2018 the Wunderground data is in Farenheid.
 #'@param datafile Downloaded wunderground data
 #'@param fname Filename to write the filtered data
+#'@importFrom data.table fread rleid setorder data.table
+#'@importFrom stats approx
+#'@importFrom lubridate round_date
 #'@export
 clean_wunderground<-function(Tunit="Farenheid",
                              datafile="C:/Users/marie/OneDrive/Documenten/uhi_max/inst/Wunderground/IUTRECHT23/daydata_rbind_2009-01-01_until_2018-11-27.txt",
                              fname="C:/Users/marie/OneDrive/Documenten/uhi_max/inst/Wunderground/Filtered/IUTRECHT23_filtered.rds"){
-  requireNamespace("data.table",quietly = TRUE)
-  requireNamespace("lubridate",quietly = TRUE)
-
   wur_stations_data<-fread(datafile)
 
 message("Preparing input data")

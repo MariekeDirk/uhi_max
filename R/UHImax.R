@@ -11,23 +11,29 @@
 #' and specific heat capacity (approximately 1005).
 #' @param DTR diurnal temperature range calculated from Tmax and Tmin in the rural area. Start=day0 08:00, Stop=day1 07:00
 #' @param U mean 10 meter wind speed (m/s) from hourly data from the rural site. Start=day0 08:00 Stop=day1 07:00
+#' @param a1,a2,a3,lambda fitting coeficients
 #' @export
 UHImax<-function(SVF,fveg,S,DTR,U,a1=2,a2=1,a3=1,lambda=3.6){
   UHImax<-(a1-a2*SVF-a3*fveg)*((S*(DTR^3)/U)^(1/lambda))
   return(UHImax)
 }
 
-#'Events with urban rural temperature relations
 #'@title Events with urban rural temperature relations
 #'@description Determines the days without distrubances of weather phenomena such as frontal systems or fog.
-#'Classified according to the rules used in Theeuwes(2016).
+#'Classified according to the rules used in Theeuwes(2016). The following rules are checked:
+#'\itemize{
+#'\item If the hourly rainfall exceeds 0.3mm
+#'\item Or if  the relative humidity is above 80\%
+#'\item Or if the changes is the wind are more than 2m/s
+#'\item Or if the daily mean wind speed is lower than 0.5m/s (This because it is hard to measure these low wind speeds)
+#'}
+#'These settings will leave 25-40\% of the data available for further analysis.
 #'@param time time of the measurements in hours
 #'@param rain rainfall in mm
 #'@param wind wind speed in m/s
-#'@param rh relative humidity in %
+#'@param rh relative humidity in \%
 #'@export
 uhi_sub<-function(time,rain,wind,rh){
-  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"rain"=as.numeric(rain),"wind"=as.numeric(wind),"rh"=as.numeric(rh))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
@@ -53,13 +59,18 @@ uhi_sub<-function(time,rain,wind,rh){
   U<-mapply(function(y,z) all(df$wind_diff[y:z]<2),
             y=start,
             z=stop)
-  meteo<-data.frame(R,RH,U)
+
+  U2<-mapply(function(y,z) mean(df$wind[y:z])<0.5,
+            y=start,
+            z=stop)
+  meteo<-data.frame(R,RH,U,U2)
   meteo<-apply(meteo,1,all)
 
   ss<-data.frame("start"=df$hour[start],"stop"=df$hour[stop],
                  "Rain"=R,
                  "rh"=RH,
                  "Wind"=U,
+                 "Wind2"=U2,
                  "Select"=meteo)
   return(ss)
 }
@@ -70,9 +81,9 @@ uhi_sub<-function(time,rain,wind,rh){
 #' rural site for a time period starting on Day0 01:00 up to Day1 00:00.
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param solar_irr solar irradiance measurements at the times of the time vector
+#' @importFrom dplyr %>% group_by summarize
 #' @export
 calc_S<-function(time,solar_irr){
-  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"solar_irr"=as.numeric(solar_irr))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
@@ -103,9 +114,9 @@ calc_S<-function(time,solar_irr){
 #' temperature difference of the rural site for a time period starting on Day0 08:00 up to Day1 07:00.
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param temperature temperature measurmenents at the times of the time vector
+#' @importFrom lubridate hour minute
 #' @export
 calc_DTR<-function(time,temperature){
-  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"T"=as.numeric(temperature))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
@@ -142,11 +153,10 @@ calc_DTR<-function(time,temperature){
 #' @param wind wind speed at the times of the time vector
 #' @export
 calc_U<-function(time,wind){
-  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"wind"=as.numeric(wind))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
-  df.h<-df %>% group_by(day,hour) %>% summarize(W=mean(wind,na.rm=TRUE))
+  df.h<-df %>% dplyr::group_by(day,hour) %>% dplyr::summarize(W=mean(wind,na.rm=TRUE))
   df.h<-data.frame(df.h)
   df.h$hour<-as.POSIXct(df.h$hour)
   start=which(hour(df.h$hour)==8)
@@ -174,13 +184,13 @@ calc_U<-function(time,wind){
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param Tref Reference temperature from the rural site
 #' @param Tcity Temperature within the city for-which the UHImax is calculated
+#' @importFrom dplyr %>%
 #' @export
 calc_UHImax<-function(time,Tref,Tcity){
-  requireNamespace("lubridate",quietly = TRUE)
   df<-data.frame(time,"Tref"=as.numeric(Tref),"Tcity"=as.numeric(Tcity))
   df$hour<-cut(df$time,breaks="hour")
   df$day<-as.Date(df$time)
-  df.h<-df %>% group_by(day,hour) %>% summarize(UHImax=mean(Tcity-Tref,na.rm=TRUE))
+  df.h<-df %>% dplyr::group_by(day,hour) %>% dplyr::summarize(UHImax=mean(Tcity-Tref,na.rm=TRUE))
   df.h<-data.frame(df.h)
   df.h$hour<-as.POSIXct(df.h$hour)
   start=which(hour(df.h$hour)==8)

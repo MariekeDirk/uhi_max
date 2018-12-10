@@ -13,12 +13,16 @@ uhi_sub(time, rain, wind, rh)
 
 \item{wind}{wind speed in m/s}
 
-\item{rh}{relative humidity in %}
+\item{rh}{relative humidity in \%}
 }
 \description{
 Determines the days without distrubances of weather phenomena such as frontal systems or fog.
-Classified according to the rules used in Theeuwes(2016).
+Classified according to the rules used in Theeuwes(2016). The following rules are checked:
+\itemize{
+\item If the hourly rainfall exceeds 0.3mm
+\item Or if  the relative humidity is above 80\%
+\item Or if the changes is the wind are more than 2m/s
+\item Or if the daily mean wind speed is lower than 0.5m/s (This because it is hard to measure these low wind speeds)
 }
-\details{
-Events with urban rural temperature relations
+These settings will leave 25-40\% of the data available for further analysis.
 }

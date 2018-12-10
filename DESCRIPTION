@@ -3,8 +3,14 @@ Title: Maximum Urban Heat island
 Version: 0.0.0.9000
 Authors@R: person("Marieke", "Dirksen", email = "marieke.dirksen@knmi.nl", role = c("aut", "cre"))
 Description: Calculates the maximum heat island effect under non-disturbed meteorological conditions. Formula's according to Theeuwes(2016)
-Depends: R (>= 3.3.1)
-License: What license is it under?
+Depends: R (>= 3.0.0)
+License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.1.1
+Imports: data.table,
+        dplyr,
+        lubridate,
+        stats,
+        utils
+

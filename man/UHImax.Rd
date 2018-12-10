@@ -18,6 +18,8 @@ and specific heat capacity (approximately 1005).}
 \item{DTR}{diurnal temperature range calculated from Tmax and Tmin in the rural area. Start=day0 08:00, Stop=day1 07:00}
 
 \item{U}{mean 10 meter wind speed (m/s) from hourly data from the rural site. Start=day0 08:00 Stop=day1 07:00}
+
+\item{a1, a2, a3, lambda}{fitting coeficients}
 }
 \description{
 Maximum urban heat island intensity calculated according to Theeuwes(2016). The UHImax is defined as the maximum

@@ -8,25 +8,26 @@
 #' @param stop Date, stop period of the download period
 #' @param var Character, variable(s) which you want to download
 #' @param folder.loc Character, location were the data will be stored. For each stationname a new folder is created.
+#' @importFrom data.table fread
+#' @importFrom stats complete.cases
+#' @importFrom lubridate day mday year month
+#' @importFrom utils write.table
 #' @examples
 #' #Run the example below to store data at the current location
-#' download_time_seq(stationname = "IZUIDHOL87",
-#'                   start = as.Date("2018/04/01"),
-#'                   stop = as.Date("2018/05/01"),
-#'                   var = "TemperatureC",
-#'                   folder.loc = ".")
-#' For multiple stations use lapply:
-#' stations<-c('IZUIDHOL36','ILIMBURG36')
-#' lapply(stations,download_time_seq)
+#' #download_time_seq(stationname = "IZUIDHOL87",
+#' #                   start = as.Date("2018/04/01"),
+#' #                   stop = as.Date("2018/05/01"),
+#' #                   var = "TemperatureC",
+#' #                   folder.loc = ".")
+#' #For multiple stations use lapply:
+#' #stations<-c('IZUIDHOL36','ILIMBURG36')
+#' #lapply(stations,download_time_seq)
 #' @export
 download_time_seq<-function(stationname = "IUTRECHT23",
                             start = as.Date("2009/01/01"),
                             stop = as.Date("2018/11/27"),
                             var = "TemperatureF",
                             folder.loc = "C:/Users/marie/OneDrive/Documenten/uhi_max/inst/Wunderground/"){
-
-requireNamespace("lubridate")
-requireNamespace("data.table")
 
 if (dir.exists(paste0(folder.loc,"/",stationname))) {
   message(paste0("Already a directory for available for ",stationname))

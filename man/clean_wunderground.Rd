@@ -19,7 +19,7 @@ clean_wunderground(Tunit = "Farenheid",
 Filters out non-realistic low values downloaded using `download_time_seq`, creates UTC timestamps
 from which a 10min sequence is created. The following filters are applied:
 
-\enumerate{
+\itemize{
 \item Temperatures lower than -40 are unrealistic in the Netherlands and are excluded (set to NA)
 \item Similarly temperatures above 45 are also excluded (set to NA)
 \item In case there are more than 8 identical measurements in a row the value is set to NA
