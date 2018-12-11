@@ -12,7 +12,7 @@
 #' @param DTR diurnal temperature range calculated from Tmax and Tmin in the rural area. Start=day0 08:00, Stop=day1 07:00
 #' @param U mean 10 meter wind speed (m/s) from hourly data from the rural site. Start=day0 08:00 Stop=day1 07:00
 #' @param a1,a2,a3,lambda fitting coeficients
-#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+#' @source \url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 #' @param wd work directory, only used when write.file==TRUE
 #' @export
 UHImax<-function(SVF,fveg,S,DTR,U,a1=2,a2=1,a3=1,lambda=3.6){
@@ -34,7 +34,7 @@ UHImax<-function(SVF,fveg,S,DTR,U,a1=2,a2=1,a3=1,lambda=3.6){
 #'@param rain rainfall in mm
 #'@param wind wind speed in m/s
 #'@param rh relative humidity in \%
-#'@source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+#'@source \url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 #'@export
 uhi_sub<-function(time,rain,wind,rh){
   df<-data.frame(time,"rain"=as.numeric(rain),"wind"=as.numeric(wind),"rh"=as.numeric(rh))
@@ -85,7 +85,7 @@ uhi_sub<-function(time,rain,wind,rh){
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param solar_irr solar irradiance measurements at the times of the time vector
 #' @importFrom dplyr %>% group_by summarize
-#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+#' @source \url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 #' @export
 calc_S<-function(time,solar_irr){
   df<-data.frame(time,"solar_irr"=as.numeric(solar_irr))
@@ -119,7 +119,7 @@ calc_S<-function(time,solar_irr){
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param temperature temperature measurmenents at the times of the time vector
 #' @importFrom lubridate hour minute
-#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+#' @source \url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 #' @export
 calc_DTR<-function(time,temperature){
   df<-data.frame(time,"T"=as.numeric(temperature))
@@ -152,11 +152,11 @@ calc_DTR<-function(time,temperature){
 
 #' Calculating mean wind speeds
 #' @title Mean wind speed
-#' @description Mean wind speed calculated according to Theeuwes(2016). The mean wind speed is defined as the mean
+#' @description Mean wind speed calculated according to Theeuwes(2017). The mean wind speed is defined as the mean
 #' wind at the rural site for a time period starting on Day0 08:00 up to Day1 07:00.
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param wind wind speed at the times of the time vector
-#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+#' @source \url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 #' @export
 calc_U<-function(time,wind){
   df<-data.frame(time,"wind"=as.numeric(wind))
@@ -191,7 +191,7 @@ calc_U<-function(time,wind){
 #' @param Tref Reference temperature from the rural site
 #' @param Tcity Temperature within the city for-which the UHImax is calculated
 #' @importFrom dplyr %>%
-#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+#' @source \url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 #' @export
 calc_UHImax<-function(time,Tref,Tcity){
   df<-data.frame(time,"Tref"=as.numeric(Tref),"Tcity"=as.numeric(Tcity))

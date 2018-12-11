@@ -24,5 +24,5 @@ uhimax_params(STN, svf, fveg, city_T, rural_T, rural_meteo, wd = NULL,
 }
 \description{
 Calculates the maximum urban heat island based on city observations and
-rural observations. Data is prepared for UHImax..
+rural observations. Data is prepared for UHImax.
 }

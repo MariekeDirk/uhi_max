@@ -4,7 +4,7 @@
 \alias{UHImax}
 \title{Maximum urban heat island intensity}
 \source{
-https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+\url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 }
 \usage{
 UHImax(SVF, fveg, S, DTR, U, a1 = 2, a2 = 1, a3 = 1, lambda = 3.6)

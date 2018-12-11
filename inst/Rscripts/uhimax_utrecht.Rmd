@@ -73,6 +73,21 @@ Within the city of Utrecht we have carefully selected three stations from the [W
 
 These stations have been measuring the city temperature for the past couple of years. The data can be downloaded using `download_time_seq`, note that the temperature is in Farenheid and not degrees Celcius. The data has been filtered and interpolated to 10minute timestamps. Unrealistic high and low temperatures are set to NA. In case more than 8 identical measurements in a row occur the value is also set to NA.
 
+```{r other stations}
+svf_grn<-readRDS(paste0(wd,"/Rdata/wunderground_svf_grn.rds"))
+df.svf_grn<-data.frame(svf_grn)
+df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299"),]
+stations<-df.svf_grn$Station.ID
+city_T<-paste0(wd,"Wunderground/Filtered/",df.svf_grn$Station.ID,"_filtered.rds")
+svf<-df.svf_grn$svf
+fveg<-df.svf_grn$grn
+
+sp.IUTRECHT<-df.svf_grn
+coordinates(sp.IUTRECHT)<-~Lon+Lat
+crs(sp.IUTRECHT)<-crs("+init=epsg:28992")
+mapview(grd.svf,layer.name="layer") + sp.IUTRECHT + IUtrecht23
+```
+
 ## Calculate UHI max parameters 
 
 Setting all parameters to required to calculate the UHI with the formula of [Theeuwes (2017)](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717). For this figure no subset of meteorological conditions was made. 
@@ -87,16 +102,6 @@ uhi_Utrecht<-uhimax_params(STN="UTRECHT23",
 ggplot(uhi_Utrecht,aes(Tref,Tcity,colour=S_new)) + geom_point() + geom_abline() + scale_color_gradientn(colours = heat.colors(20))
 
 #Similarly the same function can be applied to other stations within Utrecht:
-svf_grn<-readRDS(paste0(wd,"/Rdata/wunderground_svf_grn.rds"))
-df.svf_grn<-data.frame(svf_grn)
-df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299"),]
-stations<-df.svf_grn$Station.ID
-city_T<-paste0(wd,"Wunderground/Filtered/",df.svf_grn$Station.ID,"_filtered.rds")
-svf<-df.svf_grn$svf
-fveg<-df.svf_grn$grn
-
-# uhimax_params(STN=stations[3],svf=svf[3],fveg=fveg[3],city_T = city_T[3],rural_T = Cabauw_data$Cabauw_10min,rural_meteo = Cabauw_data$Cabauw_Theeuwes)
-
 Wunderground_Utrecht<-mapply(uhimax_params, STN = stations, svf = svf, fveg = fveg, city_T = city_T,
                       MoreArgs = list(
                            rural_T = Cabauw_data$Cabauw_10min,

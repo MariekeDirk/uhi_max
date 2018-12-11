@@ -4,7 +4,7 @@
 \alias{calc_S}
 \title{Mean solar irradiance}
 \source{
-https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+\url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 }
 \usage{
 calc_S(time, solar_irr)

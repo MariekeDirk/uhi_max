@@ -4,7 +4,7 @@
 \alias{calc_U}
 \title{Mean wind speed}
 \source{
-https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+\url{https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717}
 }
 \usage{
 calc_U(time, wind)
@@ -15,7 +15,7 @@ calc_U(time, wind)
 \item{wind}{wind speed at the times of the time vector}
 }
 \description{
-Mean wind speed calculated according to Theeuwes(2016). The mean wind speed is defined as the mean
+Mean wind speed calculated according to Theeuwes(2017). The mean wind speed is defined as the mean
 wind at the rural site for a time period starting on Day0 08:00 up to Day1 07:00.
 }
 \details{
