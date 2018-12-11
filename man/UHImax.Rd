@@ -3,6 +3,9 @@
 \name{UHImax}
 \alias{UHImax}
 \title{Maximum urban heat island intensity}
+\source{
+https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+}
 \usage{
 UHImax(SVF, fveg, S, DTR, U, a1 = 2, a2 = 1, a3 = 1, lambda = 3.6)
 }
@@ -20,6 +23,8 @@ and specific heat capacity (approximately 1005).}
 \item{U}{mean 10 meter wind speed (m/s) from hourly data from the rural site. Start=day0 08:00 Stop=day1 07:00}
 
 \item{a1, a2, a3, lambda}{fitting coeficients}
+
+\item{wd}{work directory, only used when write.file==TRUE}
 }
 \description{
 Maximum urban heat island intensity calculated according to Theeuwes(2016). The UHImax is defined as the maximum

@@ -3,6 +3,9 @@
 \name{calc_DTR}
 \alias{calc_DTR}
 \title{Diurnal temperature range}
+\source{
+https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+}
 \usage{
 calc_DTR(time, temperature)
 }

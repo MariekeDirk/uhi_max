@@ -3,6 +3,9 @@
 \name{calc_U}
 \alias{calc_U}
 \title{Mean wind speed}
+\source{
+https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+}
 \usage{
 calc_U(time, wind)
 }

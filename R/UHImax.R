@@ -12,6 +12,8 @@
 #' @param DTR diurnal temperature range calculated from Tmax and Tmin in the rural area. Start=day0 08:00, Stop=day1 07:00
 #' @param U mean 10 meter wind speed (m/s) from hourly data from the rural site. Start=day0 08:00 Stop=day1 07:00
 #' @param a1,a2,a3,lambda fitting coeficients
+#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+#' @param wd work directory, only used when write.file==TRUE
 #' @export
 UHImax<-function(SVF,fveg,S,DTR,U,a1=2,a2=1,a3=1,lambda=3.6){
   UHImax<-(a1-a2*SVF-a3*fveg)*((S*(DTR^3)/U)^(1/lambda))
@@ -32,6 +34,7 @@ UHImax<-function(SVF,fveg,S,DTR,U,a1=2,a2=1,a3=1,lambda=3.6){
 #'@param rain rainfall in mm
 #'@param wind wind speed in m/s
 #'@param rh relative humidity in \%
+#'@source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
 #'@export
 uhi_sub<-function(time,rain,wind,rh){
   df<-data.frame(time,"rain"=as.numeric(rain),"wind"=as.numeric(wind),"rh"=as.numeric(rh))
@@ -82,6 +85,7 @@ uhi_sub<-function(time,rain,wind,rh){
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param solar_irr solar irradiance measurements at the times of the time vector
 #' @importFrom dplyr %>% group_by summarize
+#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
 #' @export
 calc_S<-function(time,solar_irr){
   df<-data.frame(time,"solar_irr"=as.numeric(solar_irr))
@@ -115,6 +119,7 @@ calc_S<-function(time,solar_irr){
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param temperature temperature measurmenents at the times of the time vector
 #' @importFrom lubridate hour minute
+#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
 #' @export
 calc_DTR<-function(time,temperature){
   df<-data.frame(time,"T"=as.numeric(temperature))
@@ -151,6 +156,7 @@ calc_DTR<-function(time,temperature){
 #' wind at the rural site for a time period starting on Day0 08:00 up to Day1 07:00.
 #' @param time time vector in POSIXct with at least an hourly resolution
 #' @param wind wind speed at the times of the time vector
+#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
 #' @export
 calc_U<-function(time,wind){
   df<-data.frame(time,"wind"=as.numeric(wind))
@@ -185,6 +191,7 @@ calc_U<-function(time,wind){
 #' @param Tref Reference temperature from the rural site
 #' @param Tcity Temperature within the city for-which the UHImax is calculated
 #' @importFrom dplyr %>%
+#' @source https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
 #' @export
 calc_UHImax<-function(time,Tref,Tcity){
   df<-data.frame(time,"Tref"=as.numeric(Tref),"Tcity"=as.numeric(Tcity))
@@ -209,4 +216,50 @@ calc_UHImax<-function(time,Tref,Tcity){
                   z=stop)
   ss<-data.frame("start"=df.h$hour[start],"stop"=df.h$hour[stop],"UHImeasured"=UHI_out)
   return(ss)
+}
+
+#' @title Calculate Maximum urban heat island from observations
+#' @description Calculates the maximum urban heat island based on city observations and
+#' rural observations. Data is prepared for UHImax.
+#' @param STN station number
+#' @param svf Sky view factor of the city station
+#' @param fveg Vegetation fraction of the city station
+#' @param city_T `RDS` file with the filtered city temperatures
+#' @param rural_T `data.frame` with rural observations
+#' @param rural_meteo `data.frame` with rural meteorological parameters prepared according to Theeuwes (2017)
+#' @param write.file Optional, TRUE/FALSE
+#' @importFrom utils write.table
+#' @export
+uhimax_params<-function(STN,svf,fveg,city_T,rural_T,
+                        rural_meteo,wd=NULL,write.file=FALSE){
+  Cp<-1005 #specific heat capacity
+  message("Reading city temperature data")
+  stn<-readRDS(city_T)
+
+  message("Merging with rural temperature data")
+  wur_cabauw<-merge(x=stn$interpolated_time,y=rural_T,by.x="new_time",by.y="time")
+  wur_cabauw<-wur_cabauw[complete.cases(wur_cabauw),]
+
+  message("Calculating the maximum UHI from temperature observations")
+  UHI<-calc_UHImax(time = wur_cabauw$new_time,
+                   Tcity = wur_cabauw$T_int,
+                   Tref = wur_cabauw$T)
+  UHI$Tcity<-calc_U(time=wur_cabauw$new_time,wur_cabauw$T_int)$W
+  UHI$Tref<-calc_U(time=wur_cabauw$new_time,wur_cabauw$T)$W
+  UHI<-merge(UHI,rural_meteo,by=c("start","stop"))
+  UHI$svf<-as.numeric(svf)
+  UHI$fveg<-as.numeric(fveg)
+  UHI$Cp<-Cp
+  UHI$stn<-STN
+
+  if(write.file==TRUE){
+    message("writing file")
+    file_name=paste0(wd,STN,"_UHIparams.txt") # stored previous files in folder "UHImax/"
+    write.table(UHI,file_name,
+                row.names = FALSE,
+                col.names = TRUE,
+                sep=",")
+  }
+
+  return(UHI)
 }

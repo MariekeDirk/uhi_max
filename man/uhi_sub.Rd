@@ -3,6 +3,9 @@
 \name{uhi_sub}
 \alias{uhi_sub}
 \title{Events with urban rural temperature relations}
+\source{
+https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717
+}
 \usage{
 uhi_sub(time, rain, wind, rh)
 }
