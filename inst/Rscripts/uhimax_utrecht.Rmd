@@ -9,9 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Initialization
 
-The urban heat island equations are based on [Theeuwes (2017)](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717).
 ```{r load libs, include=FALSE}
 library(uhimax)
 library(raster)
@@ -25,6 +23,7 @@ library(caret)
 ```
 
 ## Initialization
+The urban heat island equations are based on [Theeuwes (2017)](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717).
 
 ```{r params}
 wd<-"D:/uhimax/"
@@ -106,7 +105,7 @@ Wunderground_Utrecht<-mapply(uhimax_params, STN = stations, svf = svf, fveg = fv
                       MoreArgs = list(
                            rural_T = Cabauw_data$Cabauw_10min,
                            rural_meteo = Cabauw_data$Cabauw_Theeuwes
-                           ,wd = paste0(wd,"UHImax/"), write.file = TRUE
+                           #,wd = paste0(wd,"UHImax/"), write.file = TRUE
                            ),SIMPLIFY = FALSE)
 Wunderground_Utrecht<-do.call("rbind",Wunderground_Utrecht)
 
@@ -166,7 +165,7 @@ The formula of Theeuwes(2017) was derived for:
 Outside of this range the formula has not been tested.
 ```{r grid prections,eval=TRUE}
 svf.r<-raster::resample(grd.svf,grd.fveg,method="bilinear")
-values(svf.r)[values(svf.r)<0.2 | values(svf.r)>0.95] = NA
+values(svf.r)[values(svf.r)<0.2 | values(svf.r)>0.9] = NA
 values(grd.fveg)[values(grd.fveg)<0 | values(grd.fveg)>0.4] = NA
 
 city_center<-extent(c(5.1,5.13,52.08,52.098))
