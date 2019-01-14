@@ -1,0 +1,91 @@
+---
+title: 'UHI: sensitivity for SVF'
+author: "Marieke Dirksen"
+date: "10 januari 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load libs, include=FALSE}
+library(uhimax)
+library(raster)
+library(rgdal)
+library(mapview)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(caret)
+```
+
+## Observations from the station of Theeuwes
+
+
+```{r read data}
+wd<-"D:/uhimax/"
+
+uhi<-readRDS(paste0(wd,"Rdata/uhimax_obs_calc.rds"))
+uhi<-uhi[which(uhi$stn %in% "UTRECHT23"),]
+
+summary(uhi$meteo)
+```
+## Gridded data from SVF and vegetation fraction 
+
+Plotting all the data without excluding values. Extent of the area is cropped to the city center of Utrecht. 
+```{r gridded data}
+city_center<-extent(c(5.109,5.13,52.08,52.098))
+city_center<-raster(city_center)
+values(city_center)<-1
+crs(city_center)<-CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+# city_center<-projectRaster(city_center,crs=crs(grd.fveg))
+
+grd.fveg<-stack(paste0(wd,"Grids_veg_svf/greenness_utrecht_smooth_500m.grd"))
+
+svf_utrecht<-list.files(paste0(wd,"SVF_new_subset"),pattern=".grd",full.names = TRUE)
+raster_utrecht<-lapply(svf_utrecht,raster)
+
+# mapview(raster_utrecht[[1]])
+
+city_center<- projectRaster(city_center,crs=crs(raster_utrecht[[1]]))
+grd.fveg<- projectRaster(grd.fveg,crs=crs(raster_utrecht[[1]]))
+
+raster_utrecht_center<-mapply(crop,raster_utrecht,MoreArgs=list(y=extent(city_center)))
+grd.fveg_center<-crop(grd.fveg,extent(raster_utrecht_center[[1]]))
+
+mapview(raster_utrecht_center[[1]]) + grd.fveg_center + raster_utrecht_center[[2]] + raster_utrecht_center[[3]]
+```
+
+## Calculating the UHI according to Theeuwes
+
+Low and high svf and vegetation fration values are excluded. 
+```{r calc uhimax}
+uhi_center_utrecht<-function(skyview){
+  skyview<-raster::resample(skyview,grd.fveg_center,method="bilinear")
+  grd.fveg_center<-crop(grd.fveg_center,extent(skyview))
+  skyview<-crop(skyview,extent(grd.fveg_center))
+  
+  values(skyview)[values(skyview)<0.2 | values(skyview)>0.9] = NA
+  values(grd.fveg_center)[values(grd.fveg_center)<0 | values(grd.fveg_center)>0.4] = NA
+
+  uhi_center<-(2-grd.fveg_center-skyview)*median(uhi$meteo)
+  return(list("svf"=skyview,"fveg"=grd.fveg_center,"meteo"=median(uhi$meteo),"uhi"=uhi_center))
+  }
+uhi_center<-lapply(raster_utrecht_center,uhi_center_utrecht)
+mapview(uhi_center[[1]]$uhi) + uhi_center[[2]]$uhi + uhi_center[[3]]$uhi
+
+mapview(uhi_center[[1]]$fveg)
+```
+
+## Correlations between the UHI calculations
+```{r correlations}
+corr1_3m<-corLocal(uhi_center[[1]]$uhi,uhi_center[[2]]$uhi)
+corr3_5m<-corLocal(uhi_center[[2]]$uhi,uhi_center[[3]]$uhi)
+corr1_5m<-corLocal(uhi_center[[1]]$uhi,uhi_center[[3]]$uhi)
+
+mapview(corr1_3m) + # difference between the 1m and 3m
+corr1_5m + # pearson corr 3m-5m
+corr3_5m # 1-5m
+```
