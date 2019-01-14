@@ -1,0 +1,102 @@
+---
+title: "SVF sensitivity for radius & direction"
+author: "Marieke Dirksen"
+date: "January 14, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r lib,message=FALSE}
+library(sp)
+library(raster)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(reshape)
+library(reshape2)
+library(mapview)
+
+svf_namesplit<-function(svf_names){
+svf_split<-gsub("svf_","",svf_names)
+svf_split<-gsub(".grd","",svf_split)
+svf_split<-reshape::colsplit(svf_split,split="_",names=c("res","D","R"))
+svf_split<-data.frame(mapply(gsub,svf_split,MoreArgs=list(pattern="[a-zA-Z ]",replacement="")))
+svf_split<-data.frame(mapply(function(x) as.numeric(levels(x)[x]),x=svf_split))
+return(svf_split)
+}
+```
+
+```{r data}
+#here comes the listing of runs
+wd<-"/net/PC150400/nobackup/users/dirksen/data/SVF/deBiltTest/"
+svf_files<-list.files(wd,pattern=".grd")
+svf_full_names<-list.files(wd,pattern=".grd",full.names = TRUE)
+#here comes code to extract the radius direction resolution
+svf_split<-svf_namesplit(svf_files)
+
+
+#here comes a line to put everyting ordered into a DT
+svf_DT<-data.table(cbind(svf_full_names,svf_files,svf_split))
+
+message("Before sorting the data")
+head(svf_DT[,2:5])
+
+#ordering the DT
+keycols=c("res","D","R")
+setkeyv(svf_DT,keycols)
+
+message("After sorting the data")
+head(svf_DT[,2:5])
+
+```
+
+```{r correlations, cache=TRUE}
+#stack all the files
+DT_sub <- svf_DT[which(svf_DT$res == 5 &                                           svf_DT$D != 1),]
+# DT_sub<-data.frame(mapply(function(x) as.character(levels(x)[x]),x=DT_sub))
+svf_r <- DT_sub$svf_full_names
+svf_r <- as.character(levels(svf_r)[svf_r])
+file_names <- as.character(levels(DT_sub$svf_files)[DT_sub$svf_files])
+# when the number of direction equals 1 the SVF goes up to 1.86
+
+st<-lapply(svf_r,raster)
+st<-stack(st)
+names(st)<-file_names
+#here comes a corr function
+corr<-layerStats(st,"pearson",na.rm = TRUE) #!correlate to only one raster!
+
+
+corr_matrix<-corr$'pearson correlation coefficient'
+
+I<-which(colnames(corr_matrix)=="svf_5m_32d_400r.grd")
+corr_matrix<-corr_matrix[I,]
+
+
+# I_dub<-cbind(rownames(corr_matrix),colnames(corr_matrix))
+
+#store correlation in data
+melt_corr<-melt(corr_matrix)
+melt_corr<-data.table("names"=rownames(melt_corr),"correlation"=melt_corr)
+
+melt_corr$R<-svf_namesplit(melt_corr$names)$R
+melt_corr$D<-svf_namesplit(melt_corr$names)$D
+
+setorderv(melt_corr,c("R","D"))
+
+melt_corr$R <- factor(melt_corr$R, levels=(unique(melt_corr$R))[order(melt_corr$R)])
+melt_corr$D <- factor(melt_corr$D, levels=(unique(melt_corr$D))[order(melt_corr$D)])
+
+ggplot(data=melt_corr,aes(x=R,y=D,fill=correlation.value))+geom_tile()
+```
+
+```{r visualization}
+#here comes a ggplot2 function corrplot 
+#1m run with direction increase on one axis, resolution on the other
+#other 2 options
+#check if possible: xy labels 
+
+```
+
