@@ -27,10 +27,15 @@ The urban heat island equations are based on [Theeuwes (2017)](https://rmets.onl
 
 ```{r params}
 wd<-"D:/uhimax/"
+grn<-raster("D:/groenkaart_rivm/rivm_20170415_g_groenkaart_10m.tif")
 
-grd.svf<-stack(paste0(wd,"Grids_veg_svf/svf_utrecht_1m.grd"))
-grd.fveg<-stack(paste0(wd,"Grids_veg_svf/greenness_utrecht_smooth_500m.grd"))
-grd.fveg<-projectRaster(grd.fveg,crs=crs(grd.svf))
+
+grd.svf<-raster(paste0(wd,"Grids_veg_svf/svf_utrecht_1m.grd"))
+grd.svf<-blur_svf_fveg(grd.svf)
+grd.svf<-projectRaster(grd.svf,crs=crs(grn))
+
+grn.fveg<-crop(grn,extent(grd.svf))
+grn.fveg<-mask(grn.fveg,grd.svf)
 
 IUtrecht23<-data.frame(lon=52.079,lat=5.139)
 coordinates(IUtrecht23)<- ~lat+lon
