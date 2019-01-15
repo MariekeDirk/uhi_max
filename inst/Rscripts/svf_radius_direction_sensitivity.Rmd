@@ -89,7 +89,7 @@ setorderv(melt_corr,c("R","D"))
 melt_corr$R <- factor(melt_corr$R, levels=(unique(melt_corr$R))[order(melt_corr$R)])
 melt_corr$D <- factor(melt_corr$D, levels=(unique(melt_corr$D))[order(melt_corr$D)])
 
-ggplot(data=melt_corr,aes(x=R,y=D,fill=correlation.value))+geom_tile()
+
 ```
 
 ```{r visualization}
@@ -97,6 +97,10 @@ ggplot(data=melt_corr,aes(x=R,y=D,fill=correlation.value))+geom_tile()
 #1m run with direction increase on one axis, resolution on the other
 #other 2 options
 #check if possible: xy labels 
+ggplot(data=melt_corr,aes(x=R,y=D,fill=correlation.value))+
+  geom_tile() +
+  scale_fill_gradientn(colours = heat.colors(20))+
+  geom_text(data=melt_corr,aes(x=R,y=D,label=round(correlation.value,2)))
 
 ```
 
