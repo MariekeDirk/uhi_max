@@ -4,5 +4,6 @@
 .Ruserdata
 inst/Rscripts/uhimax_utrecht_cache
 inst/Rscripts/uhimax_utrecht_files
+inst/data
 
 

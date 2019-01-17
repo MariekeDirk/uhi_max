@@ -55,7 +55,7 @@ head(svf_DT[,2:5])
 
 ```{r correlations, cache=TRUE}
 #stack all the files
-DT_sub <- svf_DT[which(svf_DT$res == 5 &                                           svf_DT$D != 1),]
+DT_sub <- svf_DT[which(svf_DT$res == 1 &  svf_DT$D != 1),]
 # DT_sub<-data.frame(mapply(function(x) as.character(levels(x)[x]),x=DT_sub))
 svf_r <- DT_sub$svf_full_names
 svf_r <- as.character(levels(svf_r)[svf_r])
@@ -66,20 +66,31 @@ st<-lapply(svf_r,raster)
 st<-stack(st)
 names(st)<-file_names
 #here comes a corr function
+
+correlate_with_ref<-function(r.test,r.ref){
+st<-stack(r.ref,r.test)
+message(paste0("Calculating correlation for ",names(r.test)))
 corr<-layerStats(st,"pearson",na.rm = TRUE) #!correlate to only one raster!
-
-
 corr_matrix<-corr$'pearson correlation coefficient'
+p.corr<-data.frame(corr_matrix[1,2])
+names(p.corr)<-'pearson correlation coefficient'
+rownames(p.corr)<-names(r.test)
+return(p.corr)
+}
+# corr_matrix<-data.frame(Correlation=as.numeric())
+# for(i in 1:length(names(st))){
+#   r.corr<-correlate_with_ref(r.test=st[[i]],r.ref=st[["svf_1m_16d_200r.grd"]])
+#   corr_matrix<-rbind(corr_matrix,r.corr)
+#   print(corr_matrix)
+# }
+# saveRDS(corr_matrix,"inst/data/correlations_1m_test.rds")
 
-I<-which(colnames(corr_matrix)=="svf_5m_32d_400r.grd")
-corr_matrix<-corr_matrix[I,]
-
-
-# I_dub<-cbind(rownames(corr_matrix),colnames(corr_matrix))
+corr_matrix<-readRDS("/usr/people/dirksen/Documents/uhi_max/inst/data/correlations_1m_test.rds")
 
 #store correlation in data
-melt_corr<-melt(corr_matrix)
-melt_corr<-data.table("names"=rownames(melt_corr),"correlation"=melt_corr)
+melt_corr<-data.table("names"=rownames(corr_matrix),"correlation"=corr_matrix)
+names(melt_corr)<-c("names","correlation")
+melt_corr<-melt_corr[grep("*.grd$",melt_corr$names),]
 
 melt_corr$R<-svf_namesplit(melt_corr$names)$R
 melt_corr$D<-svf_namesplit(melt_corr$names)$D
@@ -97,10 +108,10 @@ melt_corr$D <- factor(melt_corr$D, levels=(unique(melt_corr$D))[order(melt_corr$
 #1m run with direction increase on one axis, resolution on the other
 #other 2 options
 #check if possible: xy labels 
-ggplot(data=melt_corr,aes(x=R,y=D,fill=correlation.value))+
+ggplot(data=melt_corr,aes(x=R,y=D,fill=correlation))+
   geom_tile() +
   scale_fill_gradientn(colours = heat.colors(20))+
-  geom_text(data=melt_corr,aes(x=R,y=D,label=round(correlation.value,2)))
+  geom_text(data=melt_corr,aes(x=R,y=D,label=round(correlation,2)))
 
 ```
 
