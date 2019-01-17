@@ -1,0 +1,66 @@
+---
+title: "Input UHImax visualization"
+author: "Marieke Dirksen"
+date: "15 januari 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r load libs, include=FALSE}
+library(uhimax)
+library(raster)
+library(rgdal)
+library(mapview)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(caret)
+library(ggplot2)
+library(ggmap)
+```
+
+```{r data}
+wd<-"D:/uhimax/"
+
+city_center<-extent(c(5.109,5.13,52.08,52.098))
+city_center<-raster(city_center)
+values(city_center)<-1
+crs(city_center)<-CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+
+grd.svf<-stack(paste0(wd,"Grids_veg_svf/svf_utrecht_1m.grd"))
+grd.fveg<-stack(paste0(wd,"Grids_veg_svf/greenness_utrecht_smooth_500m.grd"))
+grd.fveg<-projectRaster(grd.fveg,crs=crs(grd.svf))
+
+IUtrecht23<-data.frame(lon=52.079,lat=5.139)
+coordinates(IUtrecht23)<- ~lat+lon
+crs(IUtrecht23)<-crs("+init=epsg:4326")
+
+svf_grn<-readRDS(paste0(wd,"/Rdata/wunderground_svf_grn.rds"))
+df.svf_grn<-data.frame(svf_grn)
+df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299"),]
+stations<-df.svf_grn$Station.ID
+city_T<-paste0(wd,"Wunderground/Filtered/",df.svf_grn$Station.ID,"_filtered.rds")
+svf<-df.svf_grn$svf
+fveg<-df.svf_grn$grn
+
+svf_utrecht<-list.files(paste0(wd,"SVF_new_subset"),pattern=".grd",full.names = TRUE)
+svf_utrecht <- raster(svf_utrecht[3])
+# utrecht_bb<-extent(svf_utrecht)
+
+sp.IUTRECHT<-df.svf_grn
+coordinates(sp.IUTRECHT)<-~Lon+Lat
+crs(sp.IUTRECHT)<-crs("+init=epsg:28992")
+mapview(grd.svf,layer.name="layer") + sp.IUTRECHT + IUtrecht23 + city_center + svf_utrecht
+```
+
+```{r visualization}
+#do this part from home
+Utrecht<-get_map(location = c(lon=52,lat=5.15))
+
+```
