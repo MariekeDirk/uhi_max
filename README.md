@@ -16,7 +16,7 @@ The equation requires:
 
 * Sky view factor (value betwene 0-1) in the urban area
 * Vegetation fraction (value betwene 0-1) in the urban area
-* Temperatuer observations within the city for verification purposes
+* Temperature observations within the city for verification purposes
 * Obervations outside of the city: rural reference station
 
 From the autmaomatic weather stations (AWS) in the rural area the following data is required:
