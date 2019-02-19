@@ -10,74 +10,434 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load libs, include=FALSE}
-library(uhimax)
-library(raster)
-library(rgdal)
-library(mapview)
-library(data.table)
-library(tidyverse)
-library(lubridate)
-library(dplyr)
 library(caret)
-```
+library(data.table)
+library(dplyr)
+library(ggmap)
+library(ggplot2)
+library(leaflet)
+library(lubridate)
+library(mapview)
+library(plyr)
+library(raster)
+library(reshape2)
+library(rgdal)
+library(rgeos)
+library(tidyverse)
+library(uhimax)
 
-## Observations from the station of Theeuwes
-
-
-```{r read data}
 wd<-"D:/uhimax/"
+
+svf_utrecht<-list.files(paste0(wd,"SVF_new_subset"),pattern=".grd",full.names = TRUE)
+svf_fig<-svf_utrecht[[1]]
+
+grn<-raster("D:/groenkaart_rivm/rivm_20170415_g_groenkaart_10m.tif")
+
+buildings<-readOGR(dsn="D:/OpenStreetMap/shp",layer="buildings_sens_ext")
+buildings_crop<-readOGR(dsn="D:/OpenStreetMap/shp",layer="buildings_city_center")
 
 uhi<-readRDS(paste0(wd,"Rdata/uhimax_obs_calc.rds"))
 uhi<-uhi[which(uhi$stn %in% "UTRECHT23"),]
 
 summary(uhi$meteo)
 ```
+
+## SVF for the Wunderground without buildings
+```{r}
+svf_grn<-readRDS("D:/uhimax/Wunderground/wunderground.rds")
+sp.buf<-gBuffer(svf_grn,width=250,byid=TRUE)
+
+svf_wun<-crop(raster(svf_fig),extent(sp.buf))
+
+svf_wun<-projectRaster(svf_wun,crs=crs(buildings))
+sp.buf<-spTransform(sp.buf,CRS=crs(buildings))
+sp.buf$svf<-NA
+
+for(i in 1:length(sp.buf$Station.ID)){
+sp.IUTRECHT299<-sp.buf[sp.buf$Station.ID==sp.buf$Station.ID[i],]
+
+buildings_wun<-crop(buildings,extent(sp.IUTRECHT299))
+
+svf_wun_msk<-mask(svf_wun,sp.IUTRECHT299)
+svf_wun_no_buildings<-mask(svf_wun_msk,buildings_wun,inverse=TRUE)
+sp.buf$svf[i]<-cellStats(svf_wun_no_buildings, stat='mean')
+print(sp.buf$svf[i])
+}
+
+#transform back to RD
+# sp.buf<-spTransform(sp.buf,CRS=crs("+init=epsg:28992"))#throws an error
+# saveRDS(sp.buf,file="D:/uhimax/Wunderground/wunderground_buf.rds")
+
+```
+
+## Overview of data and observations
+```{r}
+ext_RD<-extent(c(136320, 136850, 454970, 456172))
+ext_RD<-as(ext_RD,"SpatialPolygons")
+crs(ext_RD)<-CRS("+init=epsg:28992")
+
+center_box<-data.frame(maxlat = 52.098,minlat = 52.08,maxlong = 5.13,minlong = 5.109, id="uhi max")
+center_box<-transform(center_box, laby=(maxlat +minlat )/2, labx=(maxlong+minlong )/2)
+
+sens_box<-data.frame(maxlat = 52.1372 ,minlat = 52.05591  ,maxlong = 5.109605,minlong = 5.256057, id="svf sensitivity")
+sens_box<-transform(sens_box, laby=(maxlat +minlat )/2, labx=(maxlong+minlong )/2)
+sbbox <- make_bbox(lon = c(5.1,5.26), lat = c(52,52.14), f = .1)
+
+```
+
 ## Gridded data from SVF and vegetation fraction 
 
 Plotting all the data without excluding values. Extent of the area is cropped to the city center of Utrecht. 
 ```{r gridded data}
-city_center<-extent(c(5.109,5.13,52.08,52.098))
-city_center<-raster(city_center)
-values(city_center)<-1
+#does not seem to work with mapview
+lopt = labelOptions(noHide = TRUE,
+                    direction = 'top',
+                    textOnly = TRUE,
+                    style = list(
+                                  "color" = "red",
+                                  "font-family" = "serif",
+                                  "font-style" = "italic",
+                                  "box-shadow" = "3px 3px rgba(0,0,0,0.25)",
+                                  "font-size" = "12px",
+                                  "border-color" = "rgba(0,0,0,0.5)"
+))
+
+svf_grn<-readRDS(paste0(wd,"/Rdata/wunderground_svf_grn.rds"))
+
+df.svf_grn<-data.frame(svf_grn)
+df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT376","IUTRECHT299"),]
+df.svf_grn<-subset(df.svf_grn,select=c("Station.ID","Lon","Lat"))
+sp.IUTRECHT<-df.svf_grn
+coordinates(sp.IUTRECHT)<-~Lon+Lat
+crs(sp.IUTRECHT)<-crs("+init=epsg:28992")
+
+IUtrecht23<-data.frame(lon=52.079,lat=5.139)
+coordinates(IUtrecht23)<- ~lat+lon
+crs(IUtrecht23)<-crs("+init=epsg:4326")
+IUtrecht23<-spTransform(IUtrecht23,crs(sp.IUTRECHT))
+
+df.Wunderground<-data.frame(sp.IUTRECHT)
+df.Wunderground$Station.ID<-as.character(df.Wunderground$Station.ID)
+IUtrecht23<-c("IUtrecht23","137985.5","454554.1","TRUE")
+df.Wunderground<-rbind(df.Wunderground,IUtrecht23)
+df.Wunderground$Lon<-as.numeric(df.Wunderground$Lon)
+df.Wunderground$Lat<-as.numeric(df.Wunderground$Lat)
+coordinates(df.Wunderground)<-~Lon+Lat
+crs(df.Wunderground)<-crs("+init=epsg:28992")
+df.Wunderground<-spTransform(df.Wunderground,crs("+init=epsg:4326"))
+
+#5.11461
+# city_center<-extent(c(5.10961,5.13,52.08,52.098))
+city_center<-extent(c(5.11461,5.13,52.08,52.098))
+
+city_center<-as(city_center,"SpatialPolygons")
 crs(city_center)<-CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
-# city_center<-projectRaster(city_center,crs=crs(grd.fveg))
+city_center<-spTransform(city_center,CRS=crs("+init=epsg:28992"))
+city_center_bf<-buffer(city_center,width=250)
 
-grd.fveg<-stack(paste0(wd,"Grids_veg_svf/greenness_utrecht_smooth_500m.grd"))
+sens_ext<-extent(c(5.109605,5.256057,52.05591,52.1372))
+sens_ext<-as(sens_ext,"SpatialPolygons")
+crs(sens_ext)<-CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
 
-svf_utrecht<-list.files(paste0(wd,"SVF_new_subset"),pattern=".grd",full.names = TRUE)
-raster_utrecht<-lapply(svf_utrecht,raster)
+map_ext<-extent(c(5.08,5.28,51.98,52.15))
+map_ext<-as(map_ext,"SpatialPolygons")
+crs(map_ext)<-CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
 
-# mapview(raster_utrecht[[1]])
+# library(leaflet)
+#export, width 450 height 450, crop top bottom to remove controlers
+l.osm<-leaflet(df.Wunderground,options = leafletOptions(zoomControl = FALSE)) %>% addProviderTiles("OpenStreetMap") %>%
+  addExtent(city_center,color="red",opacity=0.7,fillOpacity=0) %>%
+  addExtent(sens_ext,color="blue",opacity=0.7,fillOpacity=0.1) %>% addScaleBar(position = "topleft") %>% addCircleMarkers(color=c("lightgreen","yellow","orange"),radius=4,opacity = 1,fillOpacity = 0.7) %>%  addSimpleGraticule(interval = 0.05) 
+l.osm
 
-city_center<- projectRaster(city_center,crs=crs(raster_utrecht[[1]]))
-grd.fveg<- projectRaster(grd.fveg,crs=crs(raster_utrecht[[1]]))
+l.esri<-leaflet(df.Wunderground,options = leafletOptions(zoomControl = FALSE)) %>% addProviderTiles("Esri.WorldImagery") %>%
+  addExtent(city_center,color="red",opacity=0.7,fillOpacity=0) %>%
+  addExtent(sens_ext,color="blue",opacity=0.7,fillOpacity=0.1) %>% addScaleBar(position = "topleft") %>% addCircleMarkers(color=c("lightgreen","yellow","orange"),radius=4,opacity = 1,fillOpacity = 0.7)  %>%  addSimpleGraticule(interval = 0.05) 
+l.esri
 
-raster_utrecht_center<-mapply(crop,raster_utrecht,MoreArgs=list(y=extent(city_center)))
-grd.fveg_center<-crop(grd.fveg,extent(raster_utrecht_center[[1]]))
+#width=250,height=440
+l.center<-
+leaflet(options = leafletOptions(zoomControl =FALSE)) %>%    addProviderTiles("Esri.WorldImagery") %>%
+addExtent(city_center,color="red",opacity=0.7,fillOpacity=0) %>%
+addExtent(ext_RD,color="yellow",opacity=0.8,fillOpacity=0.1) %>% 
+addScaleBar(position = "topleft") %>%          
+addSimpleGraticule(interval = 0.01) 
 
-mapview(raster_utrecht_center[[1]]) + grd.fveg_center + raster_utrecht_center[[2]] + raster_utrecht_center[[3]]
+l.center
+```
+
+```{r smooth grids city center}
+# roads<-readOGR(dsn="D:/OpenStreetMap/shp",layer="gis_osm_roads_free_1")
+# city_center_wgs<-spTransform(city_center,CRS=crs(roads))
+# roads_crop<-crop(roads,city_center_wgs)
+# roads_crop<-spTransform(roads_crop,crs(grn))
+# roads_sp<-list("sp.lines",roads_crop,col="black",pch=1,cex=1)
+
+
+grn.fveg<-crop(grn,extent(city_center_bf))
+grn.fveg.blur<-blur_svf_fveg(grn.fveg)/100
+grn.fveg.blur<-projectRaster(grn.fveg.blur,crs=crs(city_center))
+grn.fveg.blur<-crop(grn.fveg.blur,city_center)
+
+
+m.veg<-mapview(grn.fveg.blur,
+        col.regions=rev(terrain.colors(n=41)),layer.name="vegetation fraction",at=seq(0.23,0.43,0.005),
+        map.types =c("Esri.WorldImagery")) +
+      mapview(city_center,alpha.regions=0, color="red",lwd=2) 
+# mapshot(m.veg,file="C:/Users/marie/OneDrive/Afbeeldingen/sensitivity_fveg_blur.tiff")
+
+raster_utrecht<-raster(svf_fig)
+raster_utrecht<-crop(raster_utrecht,extent(city_center_bf))
+
+raster_utrecht.blur<-blur_svf_fveg(raster_utrecht)
+raster_utrecht.blur<-crop(raster_utrecht.blur,city_center)
+
+m.svf<-mapview(raster_utrecht.blur,
+        col.regions=rev(terrain.colors(n=26)),layer.name="sky view factor",at=seq(0.46,0.71,0.01),
+        map.types =c("Esri.WorldImagery")) +
+      mapview(city_center,alpha.regions=0, color="red",lwd=2) 
+# mapshot(m.svf,file="C:/Users/marie/OneDrive/Afbeeldingen/sensitivity_svf_blur.tiff")
+# raster_utrecht<-mapply(blur_svf_fveg,raster_utrecht)
+# raster_utrecht_center<-mapply(crop,raster_utrecht,MoreArgs=list(y=extent(city_center)))
+# grd.fveg_center<-crop(grd.fveg,extent(raster_utrecht_center[[1]]))
+
+# mapview(raster_utrecht_center[[1]]) + grd.fveg_center + raster_utrecht_center[[2]] + raster_utrecht_center[[3]] #The minimum values of the SVF are located elsewhere for the 1m and 3-5m resolution runs!!!
+```
+
+## Extract SVF and VEGf from wunderground locations
+```{r}
+sens_ext<-spTransform(sens_ext,crs("+init=epsg:28992"))
+grn_svf_sens<-crop(grn,sens_ext)
+svf_svf_sens<-crop(raster(svf_fig),sens_ext)
+
+# buildings<-readOGR(dsn="D:/OpenStreetMap/shp",layer="gis_osm_buildings_a_free_1")
+# 
+# sens_ext<-spTransform(sens_ext,CRS=crs(buildings))
+# buildings_crop<-crop(buildings,sens_ext)
+# 
+# writeOGR(obj=buildings_crop, dsn="D:/OpenStreetMap/shp", layer="buildings_sens_ext", driver="ESRI Shapefile")
+#crs(buildings)
+# extent(buildings)
+# city_center_bf_WGS<-spTransform(city_center_bf,crs(buildings))
+# extent(city_center_bf_WGS)
+# buildings_crop<-crop(buildings,extent(city_center_bf_WGS))
+# writeOGR(obj=buildings_crop, dsn="D:/OpenStreetMap/shp", layer="buildings_city_center", driver="ESRI Shapefile")
+# mapview(buildings_crop)
+
+
+svf_svf_sens<-crop(svf_svf_sens,city_center_bf)
+crs(svf_svf_sens)
+svf_svf_sens<-projectRaster(svf_svf_sens,crs = crs(buildings_crop))
+rasterOptions(maxmemory = 1e+09)
+svf_msk<-mask(svf_svf_sens,buildings_crop,inverse=TRUE)
+mapview(svf_msk)
+# writeRaster(svf_msk,filename = "D:/uhimax/SVF_res/svf_utrecht_building_mask.grd")
+
+grn_svf_sens_blur<-blur_svf_fveg(grn_svf_sens)/100
+svf_svf_sens_blur<-blur_svf_fveg(svf_svf_sens)
+
+#df.Wunderground@data$fveg<-extract(grn_svf_sens_blur,df.Wunderground)
+#df.Wunderground@data$svf<-extract(svf_svf_sens_blur,df.Wunderground)
 ```
 
 ## Calculating the UHI according to Theeuwes
 
-Low and high svf and vegetation fration values are excluded. 
+The SVF is masked using building shapefiles from OpenStreetMap. The averaged SVF with a radius of 250m excluding NA values is calculated.  
+
 ```{r calc uhimax}
 uhi_center_utrecht<-function(skyview){
-  skyview<-raster::resample(skyview,grd.fveg_center,method="bilinear")
-  grd.fveg_center<-crop(grd.fveg_center,extent(skyview))
+  skyview<-mask(skyview,buildings_crop,inverse=TRUE)
+  skyview<-blur_svf_fveg(skyview)
+  skyview<-raster::resample(skyview,grn.fveg.blur,method="bilinear")
+  grd.fveg_center<-crop(grn.fveg.blur,extent(skyview))
   skyview<-crop(skyview,extent(grd.fveg_center))
   
-  values(skyview)[values(skyview)<0.2 | values(skyview)>0.9] = NA
-  values(grd.fveg_center)[values(grd.fveg_center)<0 | values(grd.fveg_center)>0.4] = NA
+  # values(skyview)[values(skyview)<0.2 | values(skyview)>0.9] = NA
+  # values(grd.fveg_center)[values(grd.fveg_center)<0 | values(grd.fveg_center)>0.5] = NA
 
   uhi_center<-(2-grd.fveg_center-skyview)*median(uhi$meteo)
   return(list("svf"=skyview,"fveg"=grd.fveg_center,"meteo"=median(uhi$meteo),"uhi"=uhi_center))
   }
-uhi_center<-lapply(raster_utrecht_center,uhi_center_utrecht)
-mapview(uhi_center[[1]]$uhi) + uhi_center[[2]]$uhi + uhi_center[[3]]$uhi
+raster_utrecht_center<-lapply(svf_utrecht,stack)
+buildings_crop<-spTransform(buildings_crop,crs(raster_utrecht_center[[1]]))
 
-mapview(uhi_center[[1]]$fveg)
+uhi_center<-lapply(raster_utrecht_center,uhi_center_utrecht)
+
+saveRDS(uhi_center,file="D:/uhimax/SVF_res/uhi_center.rds")
+mapview(uhi_center[[1]]$uhi) + uhi_center[[2]]$uhi + uhi_center[[3]]$uhi +city_center
+
+
 ```
+
+```{r visualization}
+library(lattice)
+trellis.par.set(sp.theme())
+roads<-readOGR(dsn="D:/OpenStreetMap/shp",layer="gis_osm_roads_free_1")
+# buildings<-readOGR(dsn="D:/OpenStreetMap/shp",layer="gis_osm_buildings_a_free_1")
+
+city_center_wgs<-spTransform(city_center,CRS=crs(roads))
+# buildings_crop<-crop(buildings,city_center_wgs)
+
+roads_crop<-crop(roads,city_center_wgs)
+
+
+water<-readOGR(dsn="D:/OpenStreetMap/shp",layer="gis_osm_water_a_free_1")
+
+uhi_utrecht<-stack(uhi_center[[1]]$uhi,uhi_center[[2]]$uhi,uhi_center[[3]]$uhi)
+
+water_crop<-crop(water,city_center_wgs)
+water_crop<-spTransform(water_crop,crs(uhi_utrecht))
+water_sp<-list("sp.polygons",water_crop,fill="blue",first=FALSE)
+
+
+names(uhi_utrecht)<-c("res=1m","res=3m","res=5m")
+roads_crop<-spTransform(roads_crop,crs(uhi_utrecht))
+roads_sp<-list("sp.lines",roads_crop,col="black",pch=1,cex=1)
+
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+	offset = c(136400,456580), scale = 300, which=1,
+	fill=c("cyan","green"),first=FALSE)
+s_text0 <- list("sp.text", c(136400, 456600 + 40), "0",col="green" ,cex = 1, which = 1,first=FALSE)
+s_text1 <- list("sp.text", c(136400 + 300, 456600 + 40),col="green" , "300m", cex = 1, which = 1,first=FALSE)
+
+scale2 = list("SpatialPolygonsRescale", layout.scale.bar(), 
+	offset = c(136400,456580), scale = 300, which=1,
+	fill=c("black","red"),first=FALSE)
+s2_text0 <- list("sp.text", c(136400, 456600 + 40), "0",col="red",cex = 1, which = 1,first=FALSE)
+s2_text1 <- list("sp.text", c(136400 + 300, 456600 + 40),"300m",col="red", cex = 1, which = 1,first=FALSE)
+
+
+scale4 = list("SpatialPolygonsRescale", layout.scale.bar(), 
+	offset = c(136400,456580), scale = 300, which=4,
+	fill=c("cyan","green"),first=FALSE)
+s4_text0 <- list("sp.text", c(136400, 456600 + 40), "0",col="cyan",cex = 1, which = 4,first=FALSE)
+s4_text1 <- list("sp.text", c(136400 + 300, 456600 + 40),"300m",col="cyan", cex = 1, which = 4,first=FALSE)
+
+
+#Urban heat island plot for Utrecht center
+# uhi_utrecht<-projectRaster(uhi_utrecht,crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+
+png(filename = "C:/Users/marie/OneDrive/Afbeeldingen/uhi_utrecht.jpg",
+    width=2800,
+    height=1800,
+    res=300)
+spplot(uhi_utrecht,
+       col.regions=rev(heat.colors(n=100)),
+       alpha.regions=0.8,
+       names.attr=c("(a)","(b)","(c)"),
+       sp.layout=list(roads_sp,water_sp,scale,s_text0,s_text1),
+       scales=list(draw=TRUE)
+	)
+dev.off()
+
+
+#Green fraction in Utrecht Center
+grn_svf_sens_blur<-resample(grn_svf_sens_blur,grn_svf_sens)
+grn_svf_sens_utrecht<-crop(grn_svf_sens,city_center)/100
+grn_svf_sens_blur_utrecht<-crop(grn_svf_sens_blur,city_center)
+st.grn<-stack(grn_svf_sens_utrecht,grn_svf_sens_blur_utrecht)
+png(filename = "C:/Users/marie/OneDrive/Afbeeldingen/fveg_utrecht.jpg",
+    width=1800,
+    height=1550,
+    res=300)
+spplot(st.grn,
+       col.regions=rev(terrain.colors(n=100)),
+       alpha.regions=0.8,
+       names.attr=c("(a)","(b)"),
+       sp.layout=list(roads_sp,water_sp,scale2,s2_text0,s2_text1),
+       scales=list(draw=TRUE)
+	)
+dev.off()
+
+# svf_utrecht<-stack(uhi_center[[1]]$svf,uhi_center[[2]]$svf,uhi_center[[3]]$svf)
+# svf_utrecht<-crop(svf_utrecht,city_center)
+# svf_utrecht<-resample(svf_utrecht,raster_utrecht_center[[1]])
+# raster_utrecht_center<-mapply(crop,raster_utrecht_center,MoreArgs = list(y=extent(city_center)))
+# svf_3m<-resample(raster_utrecht_center[[2]],raster_utrecht_center[[1]])
+# svf_5m<-resample(raster_utrecht_center[[3]],raster_utrecht_center[[1]])
+# svf_utrecht<-stack(raster_utrecht_center[[1]],svf_3m,svf_5m,svf_utrecht)
+# saveRDS(svf_utrecht,file="D:/uhimax/SVF_res/svf_utrecht_resampled.rds")
+
+#Sky view factor in Utrecht center
+svf_utrecht<-readRDS("D:/uhimax/SVF_res/svf_utrecht_resampled.rds")
+png(filename = "C:/Users/marie/OneDrive/Afbeeldingen/svf_utrecht.jpg",
+    width=3300,
+    height=3800,
+    res=300)
+spplot(svf_utrecht,
+       layout=c(3,2),
+       col.regions=terrain.colors(n=100),
+       alpha.regions=0.8,
+       names.attr=c("(a)","(b)","(c)","(d)","(e)","(f)"),
+       sp.layout=list(roads_sp,water_sp,scale2,s2_text0,s2_text1),
+       scales=list(draw=TRUE)
+	)
+dev.off()
+
+svf_RD<-stack("D:/uhimax/SVF_res/st_sens_RD.grd")
+
+
+scale3 = list("SpatialPolygonsRescale", layout.scale.bar(), 
+	offset = c(136550,456072), scale = 150, which=1,
+	fill=c("black","red"),first=FALSE)
+s3_text0 <- list("sp.text", c(136550, 456072 + 40), "0",col="red",cex = 1.4, which = 1,first=FALSE)
+s3_text1 <- list("sp.text", c(136550 + 150, 456072 + 40),"150m",col="red", cex = 1.4, which = 1,first=FALSE)
+
+#Radius and direction sensitivity
+svf_RD<-crop(svf_RD,ext_RD)
+png(filename = "C:/Users/marie/OneDrive/Afbeeldingen/svf_RD.jpg",
+    width=3800,
+    height=2400,
+    res=300)
+spplot(svf_RD,
+       layout=c(4,1),
+       col.regions=terrain.colors(n=100),
+       alpha.regions=0.8,
+       names.attr=c("(1)","(2)","(3)","(4)"),
+       sp.layout=list(roads_sp,water_sp,scale3,s3_text0,s3_text1),
+       scales=list(draw=TRUE)
+	)
+dev.off()
+
+
+
+
+```
+
+```{r grid sens}
+roads<-readOGR(dsn="D:/OpenStreetMap/shp",layer="gis_osm_roads_free_1")
+grd_resolution<-stack("D:/uhimax/SVF_res/svf_res.grd")
+sens_ext_wgs<-spTransform(sens_ext,CRS=crs(roads))
+roads_crop<-crop(roads,sens_ext_wgs)
+roads_crop<-spTransform(roads_crop,crs(grd_resolution))
+roads_sp<-list("sp.lines",roads_crop,col="black",pch=1,cex=0.1,alpha=0.1)
+
+water<-readOGR(dsn="D:/OpenStreetMap/shp",layer="gis_osm_water_a_free_1")
+water_crop<-crop(water,sens_ext_wgs)
+water_crop<-spTransform(water_crop,crs(grd_resolution))
+water_sp<-list("sp.polygons",water_crop,fill="blue",col="blue",cex=0.2,alpha=0.3,first=FALSE)
+
+scale5 = list("SpatialPolygonsRescale", layout.scale.bar(), 
+	offset = c(137000,460000), scale = 2500, which=1,
+	fill=c("black","red"),first=FALSE)
+s5_text0 <- list("sp.text", c(137000, 460000 + 450), "0",col="red",cex = 1, which = 1,first=FALSE)
+s5_text1 <- list("sp.text", c(137000 + 2500, 460000 + 450),"1.5km",col="red", cex = 1, which = 1,first=FALSE)
+
+png(filename = "C:/Users/marie/OneDrive/Afbeeldingen/svf_res_sensitivity.jpg",
+    width=2000,
+    height=3300,
+    res=300)
+spplot(grd_resolution,
+       layout=c(2,4),
+       col.regions=terrain.colors(n=100),
+       names.attr=c("(a)","(b)","(c)","(d)","(e)","(f)","(g)","(h)"),
+       sp.layout=list(roads_sp,water_sp,scale5,s5_text0,s5_text1),
+       scales=list(draw=TRUE))
+dev.off()
+```
+
+
+
 
 ## Correlations between the UHI calculations
 ```{r correlations}

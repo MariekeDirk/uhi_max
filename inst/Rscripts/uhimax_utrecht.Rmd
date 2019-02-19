@@ -25,26 +25,50 @@ library(caret)
 ## Initialization
 The urban heat island equations are based on [Theeuwes (2017)](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717).
 
-```{r params}
+```{r grids}
 wd<-"D:/uhimax/"
 grn<-raster("D:/groenkaart_rivm/rivm_20170415_g_groenkaart_10m.tif")
 
 
-grd.svf<-raster(paste0(wd,"Grids_veg_svf/svf_utrecht_1m.grd"))
-grd.svf<-blur_svf_fveg(grd.svf)
-grd.svf<-projectRaster(grd.svf,crs=crs(grn))
+# grd.svf<-raster(paste0(wd,"Grids_veg_svf/svf_utrecht_1m.grd"))
+# grd.svf<-blur_svf_fveg(grd.svf)
+# grd.svf<-projectRaster(grd.svf,crs=crs(grn))
+# 
+# grn.fveg<-crop(grn,extent(grd.svf))
+# grn.fveg<-blur_svf_fveg(grn.fveg)/100
+# grd.fveg<-mask(grn.fveg,grd.svf)
+# 
+# st_fveg_svf<-stack(grd.svf,grd.fveg)
+# names(st_fveg_svf)<-c("svf","fveg")
+# writeRaster(st_fveg_svf,filename=paste0(wd,"Grids_veg_svf/svf_grn_blur500m.grd"),
+#             overwrite=TRUE)
+# 
+# mapview(grd.fveg)
+```
+## Wunderground network data in Utrecht
+Within the city of Utrecht we have carefully selected three stations from the [Wunderground network](www.wunderground.com):
 
-grn.fveg<-crop(grn,extent(grd.svf))
-grn.fveg<-mask(grn.fveg,grd.svf)
+* IUTRECHT23 (Used by [Theeuwes (2017)](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717))
+* IUTRECHT196 (not in sensitivity area)
+* IUTRECHT376
+* IUTRECHT299
 
-IUtrecht23<-data.frame(lon=52.079,lat=5.139)
-coordinates(IUtrecht23)<- ~lat+lon
-crs(IUtrecht23)<-crs("+init=epsg:4326")
+These stations have been measuring the city temperature for the past couple of years. The data can be downloaded using `download_time_seq`, note that the temperature is in Farenheid and not degrees Celcius. The data has been filtered and interpolated to 10minute timestamps. Unrealistic high and low temperatures are set to NA. In case more than 8 identical measurements in a row occur the value is also set to NA.
 
-mapview(grd.fveg) + mapview(IUtrecht23)
+```{r stations utrecht}
 
-IUtrecht23_fveg<-raster::extract(grd.fveg,IUtrecht23)
-IUtrecht23_svf<-raster::extract(grd.svf,IUtrecht23)
+svf_grn<-readRDS("D:/uhimax/Wunderground/wunderground.rds")
+df.svf_grn<-data.frame(svf_grn)
+stations<-df.svf_grn$Station.ID
+city_T<-paste0(wd,"Wunderground/Filtered/",df.svf_grn$Station.ID,"_filtered.rds")
+
+
+svf<-df.svf_grn$svf
+fveg<-df.svf_grn$fveg
+
+sp.IUTRECHT<-svf_grn
+# coordinates(sp.IUTRECHT)<-~Lon+Lat
+# crs(sp.IUTRECHT)<-crs("+init=epsg:28992")
 ```
 
 ## From 10min data to Daily UHImax parameters
@@ -67,50 +91,29 @@ Cabauw_data<-prepare_Cabauw(ten_min = paste0(wd,"Cabauw_meteo/cabauw10min.csv"),
                             hourly_data = paste0(wd,"Cabauw_meteo/cabauw_hourly.csv"))
 ```
 
-## Wunderground network data in Utrecht
-Within the city of Utrecht we have carefully selected three stations from the [Wunderground network](www.wunderground.com):
 
-* IUTRECHT23 (Used by [Theeuwes (2017)](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717))
-* IUTRECHT196
-* IUTRECHT376
-* IUTRECHT299
 
-These stations have been measuring the city temperature for the past couple of years. The data can be downloaded using `download_time_seq`, note that the temperature is in Farenheid and not degrees Celcius. The data has been filtered and interpolated to 10minute timestamps. Unrealistic high and low temperatures are set to NA. In case more than 8 identical measurements in a row occur the value is also set to NA.
 
-```{r other stations}
-svf_grn<-readRDS(paste0(wd,"/Rdata/wunderground_svf_grn.rds"))
-df.svf_grn<-data.frame(svf_grn)
-df.svf_grn<-df.svf_grn[df.svf_grn$Station.ID %in% c("IUTRECHT196","IUTRECHT376","IUTRECHT299"),]
-stations<-df.svf_grn$Station.ID
-city_T<-paste0(wd,"Wunderground/Filtered/",df.svf_grn$Station.ID,"_filtered.rds")
-svf<-df.svf_grn$svf
-fveg<-df.svf_grn$grn
-
-sp.IUTRECHT<-df.svf_grn
-coordinates(sp.IUTRECHT)<-~Lon+Lat
-crs(sp.IUTRECHT)<-crs("+init=epsg:28992")
-mapview(grd.svf,layer.name="layer") + sp.IUTRECHT + IUtrecht23
-```
 
 ## Calculate UHI max parameters 
 
 Setting all parameters to required to calculate the UHI with the formula of [Theeuwes (2017)](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/joc.4717). For this figure no subset of meteorological conditions was made. 
 
 ```{r uhimax parameters,cache=TRUE}
-uhi_Utrecht<-uhimax_params(STN="UTRECHT23",
-              svf=IUtrecht23_svf,
-              fveg=IUtrecht23_fveg,
-              city_T=paste0(wd,"Wunderground/Filtered/IUTRECHT23_filtered.rds"),
-              rural_T=Cabauw_data$Cabauw_10min,
-              rural_meteo=Cabauw_data$Cabauw_Theeuwes)
-ggplot(uhi_Utrecht,aes(Tref,Tcity,colour=S_new)) + geom_point() + geom_abline() + scale_color_gradientn(colours = heat.colors(20))
+# uhi_Utrecht<-uhimax_params(STN="UTRECHT23",
+#               svf=IUtrecht23_svf,
+#               fveg=IUtrecht23_fveg,
+#               city_T=paste0(wd,"Wunderground/Filtered/IUTRECHT23_filtered.rds"),
+#               rural_T=Cabauw_data$Cabauw_10min,
+#               rural_meteo=Cabauw_data$Cabauw_Theeuwes)
+# ggplot(uhi_Utrecht,aes(Tref,Tcity,colour=S_new)) + geom_point() + geom_abline() + scale_color_gradientn(colours = heat.colors(20))
 
 #Similarly the same function can be applied to other stations within Utrecht:
 Wunderground_Utrecht<-mapply(uhimax_params, STN = stations, svf = svf, fveg = fveg, city_T = city_T,
                       MoreArgs = list(
                            rural_T = Cabauw_data$Cabauw_10min,
                            rural_meteo = Cabauw_data$Cabauw_Theeuwes
-                           #,wd = paste0(wd,"UHImax/"), write.file = TRUE
+                           ,wd = paste0(wd,"UHImax/"), write.file = TRUE
                            ),SIMPLIFY = FALSE)
 Wunderground_Utrecht<-do.call("rbind",Wunderground_Utrecht)
 
@@ -125,6 +128,9 @@ uhimax_files<-list.files(paste0(wd,"UHImax/"),
 uhimax_files<-lapply(uhimax_files,fread)
 uhimax_Utrecht<-do.call("rbind",uhimax_files)
 
+uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("UTRECHT23","IUTRECHT376","IUTRECHT299")),]
+# uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT299")),]
+# uhimax_Utrecht$stn[which(uhimax_Utrecht$stn=="UTRECHT23")]<-"IUTRECHT23"
 # uhimax_Utrecht<-fread(paste0(wd,"UHImax/IUTRECHT23_UHIparams.txt"))
 
 uhimax_Utrecht<-merge(Cabauw_data$Cabauw_sub,uhimax_Utrecht,by=c("start","stop"))
@@ -134,7 +140,10 @@ uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$rh==TRUE),]
 # uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Select==TRUE),]
 uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$Tref>17),]
 # uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT23","IUTRECHT376")),]
-uhimax_Utrecht<-uhimax_Utrecht[which(uhimax_Utrecht$stn %in% c("IUTRECHT23","IUTRECHT196","IUTRECHT376","IUTRECHT299")),]
+
+wur.R2<-caret::R2((2-uhimax_Utrecht$svf-uhimax_Utrecht$fveg)*uhimax_Utrecht$meteo,uhimax_Utrecht$UHImeasured)
+wur.RMSE<-caret::RMSE((2-uhimax_Utrecht$svf-uhimax_Utrecht$fveg)*uhimax_Utrecht$meteo,uhimax_Utrecht$UHImeasured)
+
 ```
 
 ## Correlations with the three meteo params
@@ -155,10 +164,23 @@ uhi_u
 uhi_DTR
 uhi_S
 
-ggplot(uhimax_Utrecht,aes(UHImeasured,(2-svf-fveg)*meteo,colour=factor(stn))) +geom_point() +geom_abline() +xlim(0,10)+ylim(0,10)
-
 caret::R2((2-uhimax_Utrecht$svf-uhimax_Utrecht$fveg)*uhimax_Utrecht$meteo,uhimax_Utrecht$UHImeasured)
 caret::RMSE((2-uhimax_Utrecht$svf-uhimax_Utrecht$fveg)*uhimax_Utrecht$meteo,uhimax_Utrecht$UHImeasured)
+
+
+R2.exp <- expression(paste(" ",R^2 ,"= 0.38"))
+
+uhimax_corr<-ggplot(uhimax_Utrecht,aes(UHImeasured,(2-svf-fveg)*meteo,colour=factor(stn))) +   geom_point(size=3) + geom_abline() + 
+  xlim(0,10) + ylim(0,10) + coord_fixed() +
+  xlab("UHImax measured") + ylab("UHImax calculated") +
+  scale_color_manual(values=c('orange','yellow','green' )) +
+  guides(color=guide_legend("Station ID"))+
+  annotate("text",x=1,y=10,label=R2.exp) +
+  annotate("text",x=1,y=9.4,label=paste0("RMSE= ",round(wur.RMSE,2)))
+uhimax_corr
+
+ggsave(uhimax_corr,
+       filename="C:/Users/marie/OneDrive/Afbeeldingen/wunderground_utrecht.png")
 ```
 ## Using the formula of Theeuwes for Utrecht
 

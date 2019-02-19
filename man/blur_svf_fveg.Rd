@@ -4,10 +4,10 @@
 \alias{blur_svf_fveg}
 \title{Blurr grid using focal functions}
 \usage{
-blur_svf_fveg(grid, radius = 500, final_res = 100)
+blur_svf_fveg(raster_grid, radius = 250, final_res = 50)
 }
 \arguments{
-\item{grid}{raster grid which needs to be smoothed}
+\item{raster_grid}{raster grid which needs to be smoothed}
 
 \item{radius}{radius over which the focal function smooths}
 
@@ -16,5 +16,6 @@ blur_svf_fveg(grid, radius = 500, final_res = 100)
 \description{
 Focal functions to smooth sky view factor and vegetation fraction
 for the UHImax calculation of a grid. Smoothings used by Koopmans et al.2018 was
-with a radius of 500m and a final resolution of 100m.
+with a radius of 500m and a final resolution of 100m.The median value is calculated within
+the radius.
 }
