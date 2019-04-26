@@ -45,7 +45,10 @@ summary(uhi$meteo)
 ## SVF for the Wunderground without buildings
 ```{r}
 svf_grn<-readRDS("D:/uhimax/Wunderground/wunderground.rds")
-sp.buf<-gBuffer(svf_grn,width=250,byid=TRUE)
+
+svf<-stack(paste0(wd,"SVF_res/svf_res_WGS84.grd")) # sky view factor values from 1 to 50m for the whole domain
+# svf<-projectRaster(svf,crs=crs(svf_grn))
+sp.buf<-gBuffer(svf,width=250,byid=TRUE) #gBuffer(svf_grn,width=250,byid=TRUE)
 
 svf_wun<-crop(raster(svf_fig),extent(sp.buf))
 

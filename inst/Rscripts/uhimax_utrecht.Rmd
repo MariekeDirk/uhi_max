@@ -113,7 +113,7 @@ Wunderground_Utrecht<-mapply(uhimax_params, STN = stations, svf = svf, fveg = fv
                       MoreArgs = list(
                            rural_T = Cabauw_data$Cabauw_10min,
                            rural_meteo = Cabauw_data$Cabauw_Theeuwes
-                           ,wd = paste0(wd,"UHImax/"), write.file = TRUE
+                           #,wd = paste0(wd,"UHImax/"), write.file = TRUE
                            ),SIMPLIFY = FALSE)
 Wunderground_Utrecht<-do.call("rbind",Wunderground_Utrecht)
 
